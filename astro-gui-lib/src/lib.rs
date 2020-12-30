@@ -68,62 +68,25 @@ impl Orbit {
         return &self.points;
     }
 
-    
-    fn get_radius(&self, nu: f32) -> f32 {
-        return (self.a * (1.0 - self.e * self.e)) / (1.0 + self.e * nu.cos());
-    }
-   
-
-    pub fn get_anti_posos(&self, nu: f32) -> Vector3<f32>{
-        let W = self.omega_big;
-        let w = self.omega_small;
-        let i = self.i;
-        let v = w + nu;
-
-        let r: f32 = self.get_radius(nu);
-        let x = r * (W.cos() * v.cos() - W.sin() * v.sin() * i.cos());
-        let y = r * (W.sin() * v.cos() + W.cos() * v.sin() * i.cos());
-        let z = r * (v.sin() * i.sin());
-        return Vector3::new(x, y, z);
-    } 
-
     //nu in [0; 2*PI]
-    fn get_radius_vector(&self, nu: f32) -> Vector3<f32>{
-        
-        /*
-        let W = self.omega_big;
-        let w = self.omega_small;
-        let i = self.i;
-        let v = w + nu;
-
-        let r: f32 = self.get_radius(nu);
-        let x = r * (W.cos() * v.cos() - W.sin() * v.sin() * i.cos());
-        let y = r * (W.sin() * v.cos() + W.cos() * v.sin() * i.cos());
-        let z = r * (v.sin() * i.sin());
-        return Vector3::new(x, y, z);
-        */
-
-        
+    fn get_radius_vector(&self, nu: f32) -> Vector3<f32>{  
         let e = self.e;
         let a = self.a;
         let e_root = self.e_root;
         let ote = &self.orb_to_ecl;
+        let temp_del = 1.0 + e * nu.cos();
 
-        let EA_cos = (e + nu.cos()) / (1.0 + e * nu.cos());
-        let EA_sin = e_root * nu.sin() / (1.0 + e * nu.cos());
+        let e_anomaly_cos = (e + nu.cos()) / temp_del;
+        let e_anomaly_sin = e_root * nu.sin() / temp_del;
         
-        println!("EA_cos {}", EA_cos);
-        println!("EA_sin {}", EA_sin);
-
-        let r_x = a * (EA_cos - e);
-        let r_y = e_root * a * EA_sin;
+        let r_x = a * (e_anomaly_cos - e);
+        let r_y = e_root * a * e_anomaly_sin;
         
         return Vector3::<f32>::new(
             ote[0] * r_x + ote[1] * r_y,  
             ote[2] * r_x + ote[3] * r_y,  
             ote[4] * r_x + ote[5] * r_y  
         );
-        
     } 
 
     pub fn get_position_and_velocity(&self, nu: f32) -> (Point3<f32>, Vector3<f32>) {
@@ -133,16 +96,17 @@ impl Orbit {
         let e_root = self.e_root;
         let speed_root = self.speed_root;
         let ote = &self.orb_to_ecl;
+        let temp_del = 1.0 + e * nu.cos();
 
-        let EA_cos = (e + nu.cos()) * (1.0 + e * nu.cos());
-        let EA_sin = e_root * nu.sin() / (e + nu.cos());
+        let e_anomaly_cos = (e + nu.cos()) / temp_del;
+        let e_anomaly_sin = e_root * nu.sin() / temp_del;
 
-        let r_x = a * (EA_cos - e);
-        let r_y = e_root * a * EA_sin;
+        let r_x = a * (e_anomaly_cos - e);
+        let r_y = e_root * a * e_anomaly_sin;
         
-        let v_mult = speed_root / (1.0 - e * EA_cos);
-        let v_x = -v_mult * EA_sin;
-        let v_y =  v_mult * e_root * EA_cos;
+        let v_mult = speed_root / (1.0 - e * e_anomaly_cos);
+        let v_x = -v_mult * e_anomaly_sin;
+        let v_y =  v_mult * e_root * e_anomaly_cos;
 
         return (
             Point3::<f32>::new(
@@ -158,32 +122,12 @@ impl Orbit {
         );
     }
 
-    //pub fn get_point_and_speed(&self, nu: f32)
-
-    pub fn generate_anti_pososat(&self, count: usize) -> Vec<Point3<f32>>{
-        use core::f32::consts::TAU;
-        let mut vec = Vec::<Point3<f32>>::new();
-        let mut nu: f32 = 0.0;
-
-        for _ in 0..count {
-            let point = Point3::from(self.get_anti_posos(nu));
-            println!("nu = {}", nu.to_degrees());
-            println!("    X = {}", point[0]);
-            println!("    Y = {}", point[1]);
-            println!("    Z = {}", point[2]);
-            println!();
-            vec.push(point);
-            nu += TAU / (count as f32);
-        }    
-        return vec;
-    }
-
     fn generate_orbit_points(&mut self, count: usize) {
         use core::f32::consts::TAU;
 
         let mut nu: f32 = 0.0;
 
-        for i in 0..count {
+        for _ in 0..count {
             let point = Point3::from(self.get_radius_vector(nu));
             println!("nu = {}", nu.to_degrees());
             println!("    X = {}", point[0]);
