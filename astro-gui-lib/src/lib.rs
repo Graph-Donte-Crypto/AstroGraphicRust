@@ -36,7 +36,7 @@ impl Orbit {
         let e_root = (1.0 - e * e).sqrt();
         let i_rad = i.to_radians();
         let om_big = omega_big.to_radians();
-        let om_sma = omega_big.to_radians();
+        let om_sma = omega_small.to_radians();
         let mut orbit = Orbit {
             a, 
             e, 
@@ -129,11 +129,6 @@ impl Orbit {
 
         for _ in 0..count {
             let point = Point3::from(self.get_radius_vector(nu));
-            println!("nu = {}", nu.to_degrees());
-            println!("    X = {}", point[0]);
-            println!("    Y = {}", point[1]);
-            println!("    Z = {}", point[2]);
-            println!();
             self.points.push(point);
             nu += TAU / (count as f32);
         }
@@ -201,9 +196,21 @@ lazy_static! {
 
 }
 
-pub fn draw_lines(window: &mut kiss3d::window::Window, points: &Vec<Point3<f32>>, color: &Point3<f32>) {
-    for i in 0..points.len()-1 {
-        window.draw_line(&points[i], &points[i + 1], &color);
+
+pub fn draw_orbit(window: &mut kiss3d::window::Window, orbit: &Orbit, color: &Point3<f32>) {
+    let points = &(orbit.points);
+    for i in 0..points.len() - 1 {
+        window.draw_line(&(points[i]), &(points[i + 1]), &color);
     }
-    window.draw_line(&points[0], &points[points.len() - 1], &color); 
+    window.draw_line(&(points[0]), &(points[points.len() - 1]), &color);
 }
+
+pub fn draw_space_body(window: &mut kiss3d::window::Window, space_body: &SpaceBody) {
+
+}
+
+pub fn draw_space_body_with_orbit(window: &mut kiss3d::window::Window, space_body: &SpaceBody, color: &Point3<f32>) {
+    draw_orbit(window, &(space_body.orbit), color);
+    draw_space_body(window, space_body);
+}
+

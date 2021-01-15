@@ -12,6 +12,7 @@ fn main() {
     //let mut c      = window.add_cube(1.0, 1.0, 1.0);
 
     let mut sphere = window.add_sphere(1.0);
+
     //let planet = window.add_sphere(0.2);
 
     sphere.set_color(1.0, 1.0, 0.0);
@@ -28,7 +29,6 @@ fn main() {
     let orbit = agl::Orbit::new(5.263138, 0.2, 7.0, 15.0, 70.0, 1172.3328, 360);
 
     let points = orbit.get_points();
-    let anti_posos = orbit.generate_anti_pososat(360);
 
     //let vec = orbit.get_orbit_points(points_count as i32);
 
@@ -64,7 +64,6 @@ fn main() {
                 //vec[index]));
 
         agl::draw_lines(&mut window, &points, &Point3::<f32>::new(1.0, 1.0, 1.0));
-        agl::draw_lines(&mut window, &anti_posos, &Point3::<f32>::new(0.8, 0.6, 0.4));
 
         window.draw_line(&axis_0, &axis_x, &Point3::new(1.0, 0.0, 0.0));
         window.draw_line(&axis_0, &axis_y, &Point3::new(0.0, 1.0, 0.0));
