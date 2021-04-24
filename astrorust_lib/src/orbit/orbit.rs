@@ -67,7 +67,7 @@ impl Orbit {
         }
     }
 
-    pub fn r_from_nu(&self, nu: Angle) -> Vector3<Length> {
+    pub fn r_from_nu(&self, nu: Angle) -> Vector3<f64> {
 		let (e, a, e_root) = (self.e, self.a, self.e_root);
         let (sin_nu, cos_nu) = nu.sin_cos().into() as (f32, f32);
 		let inv_denominator = 1.0 / (e.mul_add(cos_nu, 1.0));
@@ -76,7 +76,7 @@ impl Orbit {
         self.r_from_sin_cos_E((sin_E, cos_E))
     }
     
-    pub fn r_and_v_from_nu(&self, nu: Angle) -> (Vector3<Length>, Vector3<Velocity>) {
+    pub fn r_and_v_from_nu(&self, nu: Angle) -> (Vector3<f64>, Vector3<f64>) {
 		let (e, a, e_root) = (self.e, self.a, self.e_root);
         let (sin_nu, cos_nu) = nu.sin_cos().into() as (f32, f32);
 		let inv_denominator = 1.0 / (e.mul_add(cos_nu, 1.0));
@@ -91,7 +91,7 @@ impl Orbit {
         self.r_from_sin_cos_E(E.sin_cos())
     }
 
-    pub fn r_and_v_from_E(&self, E: Angle) -> (Vector3<Length>, Vector3<Velocity>) {
+    pub fn r_and_v_from_E(&self, E: Angle) -> (Vector3<f64>, Vector3<f64>) {
 		let (a, e, e_root) = (self.a, self.e, self.e_root);
         let E_sin_cos = E.sin_cos();
         (self.r_from_sin_cos_E(E_sin_cos),
@@ -99,20 +99,20 @@ impl Orbit {
     }
 
     pub fn r_from_t(&self, t: Time) -> Vector3<Length> {
-        self.r_from_E(E_from_M(M_from_t(t)))
+        self.r_from_E(self.E_from_M(self.M_from_t(t)))
     }
     
-    pub fn r_and_v_from_t(&self, t: Time) -> (Vector3<Length>, Vector3<Velocity>) {
+    pub fn r_and_v_from_t(&self, t: Time) -> (Vector3<f64>, Vector3<f64>) {
         self.r_and_v_from_E(self.E_from_M(self.M_from_t(t)))
     }
 
-    fn r_from_sin_cos_E(&self, (sin_E, cos_E): (Ratio, Ratio)) -> Vector3<Length> {
+    fn r_from_sin_cos_E(&self, (sin_E, cos_E): (Ratio, Ratio)) -> Vector3<f64> {
 		let (a, e, e_root) = (self.a, self.e, self.e_root);
 		let r_orb = Vector2::new(a * (cos_E.into() - e), a * e_root * sin_E.into());
 	    self.orb_to_ecl * r_orb
     }
 
-    fn v_from_sin_cos_E(&self, (sin_E, cos_E): (Ratio, Ratio)) -> Vector3<Velocity> {
+    fn v_from_sin_cos_E(&self, (sin_E, cos_E): (Ratio, Ratio)) -> Vector3<f64> {
 		let (a, e, e_root) = (self.a, self.e, self.e_root);
 		let v_mult: Velocity = self.speed_root / (1.0 - e * cos_E.into());
 		let v_orb = Vector2::new(-v_mult * sin_E, v_mult * e_root * cos_E);

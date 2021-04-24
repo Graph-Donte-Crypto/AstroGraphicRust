@@ -1,5 +1,5 @@
 [package]
-name = "astrorust"
+name = "astrorust_lib"
 version = "0.1.0"
 authors = ["Graph-Donte-Crypto <Dimasik841@gmail.com>", "Artur Sinila <freesoftware@logarithmus.dev>"]
 edition = "2018"
