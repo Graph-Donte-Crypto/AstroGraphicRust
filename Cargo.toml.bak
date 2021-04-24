@@ -1,3 +1,2 @@
 [workspace]
 members = ["astrorust_app", "astrorust_gui_lib", "astrorust_lib"]
-default-members = ["astrorust_app"]
