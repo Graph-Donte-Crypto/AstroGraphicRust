@@ -9,13 +9,13 @@ name = "astrorust_lib"
 path = "src/lib.rs"
 
 [dependencies]
-derive_builder = "0.9.0"
+derive_builder = "0.10.2"
 getset = "0.1.1"
 nalgebra = "0.26.1"
 num-traits = "0.2.14"
-typenum = "1.12.0"
+typenum = "1.13.0"
 
 [dependencies.uom]
-version = "0.31.0"
+version = "0.31.1"
 default-features = false
 features = [ "f32", "f64", "si", "std", "try-from"]
