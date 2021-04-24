@@ -1,11 +1,10 @@
 use astrorust_gui_lib as agl;
-use agl::{kiss3d, kiss3d::nalgebra as na};
-use kiss3d::{
+use agl::kiss3d::{
 	event::{Key, MouseButton},
 	light::Light,
 	window::Window,
 };
-use na::{Point3, Translation3, UnitQuaternion, Vector3};
+use agl::nalgebra::{Point3, Translation3, UnitQuaternion, Vector3};
 
 #[allow(non_snake_case)]
 fn main() {

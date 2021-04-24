@@ -11,7 +11,7 @@ path = "src/lib.rs"
 [dependencies]
 derive_builder = "0.9.0"
 getset = "0.1.1"
-nalgebra = "0.24.1"
+nalgebra = "0.26.1"
 num-traits = "0.2.14"
 typenum = "1.12.0"
 

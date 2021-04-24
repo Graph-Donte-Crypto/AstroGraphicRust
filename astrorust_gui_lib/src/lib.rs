@@ -1,5 +1,9 @@
 #[macro_use(lazy_static)]
 extern crate lazy_static;
+
+pub use nalgebra;
+pub use kiss3d;
+
 use kiss3d::{
 	event::{Key, MouseButton},
 	light::Light,
