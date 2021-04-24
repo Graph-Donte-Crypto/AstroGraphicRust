@@ -1,6 +1,8 @@
 # AstroGraphicRust
 
-Проект по визуализации траеторий межпланетных полётов с гравитационным манёврами
+[![Rust](https://github.com/Graph-Donte-Crypto/AstroGraphicRust/workflows/Rust/badge.svg)](https://github.com/Graph-Donte-Crypto/AstroGraphicRust/actions?query=workflow%3ARust)
+
+Проект по визуализации траекторий межпланетных полётов с гравитационным манёврами
 
 A Project for visualization of interplanetary flights with gravity assists
 

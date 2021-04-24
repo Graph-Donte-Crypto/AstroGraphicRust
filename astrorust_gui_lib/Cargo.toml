@@ -1,0 +1,14 @@
+[package]
+name = "astrorust_gui_lib"
+version = "0.1.1"
+authors = ["Graph-Donte-Crypto"]
+edition = "2018"
+
+[lib]
+name = "astrorust_gui_lib"
+path = "src/lib.rs"
+
+[dependencies]
+astrorust_lib = { path = "../astrorust_lib" }
+kiss3d = "0.29.0"
+lazy_static = "1.4.0"
