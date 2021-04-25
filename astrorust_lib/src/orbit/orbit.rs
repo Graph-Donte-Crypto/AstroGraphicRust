@@ -3,7 +3,7 @@
 use core::f32::consts::TAU;
 use num_traits::real::Real;
 use typenum::{int::Z0, P3, N2};
-use nalgebra::{ArrayStorage, Const, Matrix, Matrix3x2, MatrixSlice3x2, SliceStorage, Vector2, Vector3}; 
+use nalgebra::{Matrix3x2, Vector2, Vector3}; 
 
 #[derive(Builder, Getters, Setters, Debug)]
 #[allow(non_snake_case)]
