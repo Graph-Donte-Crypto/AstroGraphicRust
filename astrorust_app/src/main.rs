@@ -1,12 +1,8 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_lib as lib;
-use gui_lib::kiss3d;
-use gui_lib::kiss3d::{
-	light::Light,
-	window::Window,
-};
-use gui_lib::kiss3d::nalgebra::{Point3, UnitQuaternion, Translation3, Vector3};
-use std::f32::consts::PI;
+use gui_lib::kiss3d::{self, event::{Action, MouseButton, WindowEvent}, light::Light, nalgebra as na, window::Window};
+use na::{Point3, UnitQuaternion, Translation3, Vector3};
+use std::{f32::consts::PI};
 
 #[allow(non_snake_case)]
 fn main() {
@@ -27,6 +23,9 @@ fn main() {
 
 	let mut camera =
 		gui_lib::kiss3d_trackball::Trackball::new(&Point3::from([10.0, 10.0, 10.0]), &Point3::origin(), &Vector3::from([0.0, 0.0, PI]));
+
+	camera.input.rebind_slide_button(Some(MouseButton::Button3));
+	camera.input.rebind_orbit_button(Some(MouseButton::Button2));
 
 	let mut index = 0_usize;
 	while window.render_with_camera(&mut camera) {
