@@ -1,0 +1,2 @@
+[workspace]
+members = ["astrorust_app", "astrorust_gui_lib", "astrorust_lib"]

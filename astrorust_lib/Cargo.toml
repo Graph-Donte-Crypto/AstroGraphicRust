@@ -1,0 +1,21 @@
+[package]
+name = "astrorust_lib"
+version = "0.1.0"
+authors = ["Graph-Donte-Crypto <Dimasik841@gmail.com>", "Artur Sinila <freesoftware@logarithmus.dev>"]
+edition = "2018"
+
+[lib]
+name = "astrorust_lib"
+path = "src/lib.rs"
+
+[dependencies]
+derive_builder = "0.10.2"
+getset = "0.1.1"
+nalgebra = "0.26.1"
+num-traits = "0.2.14"
+typenum = "1.13.0"
+
+#[dependencies.uom]
+#version = "0.31.1"
+#default-features = false
+#features = [ "f32", "f64", "si", "std", "try-from"]
