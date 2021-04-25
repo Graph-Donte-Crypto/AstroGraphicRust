@@ -14,8 +14,3 @@ getset = "0.1.1"
 nalgebra = "0.26.1"
 num-traits = "0.2.14"
 typenum = "1.13.0"
-
-#[dependencies.uom]
-#version = "0.31.1"
-#default-features = false
-#features = [ "f32", "f64", "si", "std", "try-from"]
