@@ -49,3 +49,15 @@ pub fn draw_orbit(window: &mut kiss3d::window::Window, orbit: &Orbit, color: &Po
 // 	draw_orbit(window, &(space_body.orbit), color);
 // 	draw_space_body(window, space_body);
 // }
+
+pub fn draw_full_axes(w: &mut kiss3d::window::Window, box_size: f32) {
+	w.draw_line(&Point3::from([-box_size, 0.0, 0.0]), &Point3::from([box_size, 0.0, 0.0]), &Point3::from([1.0, 0.0, 0.0]));
+	w.draw_line(&Point3::from([0.0, -box_size, 0.0]), &Point3::from([0.0, box_size, 0.0]), &Point3::from([0.0, 1.0, 0.0]));
+	w.draw_line(&Point3::from([0.0, 0.0, -box_size]), &Point3::from([0.0, 0.0, box_size]), &Point3::from([0.0, 0.0, 1.0]));
+}
+
+pub fn draw_positive_axes(w: &mut kiss3d::window::Window, box_size: f32) {
+	w.draw_line(&Point3::origin(), &Point3::from([box_size, 0.0, 0.0]), &Point3::from([1.0, 0.0, 0.0]));
+	w.draw_line(&Point3::origin(), &Point3::from([0.0, box_size, 0.0]), &Point3::from([0.0, 1.0, 0.0]));
+	w.draw_line(&Point3::origin(), &Point3::from([0.0, 0.0, box_size]), &Point3::from([0.0, 0.0, 1.0]));
+}

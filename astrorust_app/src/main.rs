@@ -8,12 +8,6 @@ use gui_lib::kiss3d::{
 };
 use gui_lib::kiss3d::nalgebra::{Point3, Translation3, UnitQuaternion, Vector3};
 
-fn draw_axis(w: &mut Window, box_size: f32) {
-	w.draw_line(&Point3::from([-box_size, 0.0, 0.0]), &Point3::from([box_size, 0.0, 0.0]), &Point3::from([1.0, 0.0, 0.0]));
-	w.draw_line(&Point3::from([0.0, -box_size, 0.0]), &Point3::from([0.0, box_size, 0.0]), &Point3::from([0.0, 1.0, 0.0]));
-	w.draw_line(&Point3::from([0.0, 0.0, -box_size]), &Point3::from([0.0, 0.0, box_size]), &Point3::from([0.0, 0.0, 1.0]));
-}
-
 #[allow(non_snake_case)]
 fn main() {
 	let mut window = Window::new("Astro Graphic Rust");
@@ -46,7 +40,7 @@ fn main() {
 		//planet.set_local_translation(Translation3::<f32>::from(point_to_vector(&vec[index])));
 		//vec[index]));
 		gui_lib::draw_orbit(&mut window, &orbit, &Point3::from([1.0, 1.0, 1.0]));
-		draw_axis(&mut window, 500.0);
+		gui_lib::draw_full_axes(&mut window, 100_f32);
 		sphere.prepend_to_local_rotation(&rot);
 		//planet.set_local_translation(Translation3::new(20.0 * angle.cos(), 20.0 * angle.sin(), 0.0));
 		//angle += PI / 180.0;
