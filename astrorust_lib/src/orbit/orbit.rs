@@ -3,45 +3,47 @@
 use core::f32::consts::TAU;
 use num_traits::real::Real;
 use typenum::{int::Z0, P3, N2};
-use nalgebra::{Matrix3x2, Vector2, Vector3}; 
+use nalgebra::{ArrayStorage, Const, Matrix, Matrix3x2, MatrixSlice3x2, SliceStorage, Vector2, Vector3}; 
 
-#[derive(Debug)]
-// #[allow(non_snake_case)]
+#[derive(Builder, Getters, Setters, Debug)]
+#[allow(non_snake_case)]
 pub struct Orbit {
-	//#[getset(get = "pub")]
+	#[getset(get = "pub")]
 	mu: f32,
 
-	//#[getset(get = "pub")]
+	#[getset(get = "pub")]
 	a: f32,
 
-	//#[getset(get = "pub")]
-	//#[builder(default)]
+	#[getset(get = "pub")]
+	#[builder(default)]
 	e: f32,
 
-	//#[getset(get = "pub")]
-	//#[builder(default)]
+	#[getset(get = "pub")]
+	#[builder(default)]
 	i: f32,
 
-	//#[getset(get = "pub")]
-	//#[builder(default)]
-	//#[allow(non_snake_case)]
+	#[getset(get = "pub")]
+	#[builder(default)]
+	#[allow(non_snake_case)]
 	Omega: f32,
 
-	//#[getset(get = "pub")]
-	//#[builder(default)]
+	#[getset(get = "pub")]
+	#[builder(default)]
 	omega: f32,
 
-	//#[getset(get = "pub")]
-	//#[builder(default)]
+	#[getset(get = "pub")]
+	#[builder(default)]
+	#[allow(non_snake_case)]
 	M0: f32,
 
-	//#[getset(get = "pub")]
-	period: f32,		   // orbital period
+	#[getset(get = "pub")]
+	period: f32,		// orbital period
 
 	// pre-computed
 	speed_root: f32,	// sqrt(mu / a)
 	mean_motion: f32,	// sqrt(mu / a^3)
 	e_root: f32,		// sqrt(1 - e^2)
+	// matrix to transform vectors from orbital to ecliptic coordinates
 	orb_to_ecl: Matrix3x2<f32>,
 }
 
@@ -105,14 +107,14 @@ impl Orbit {
 
 	fn r_from_sin_cos_E(&self, (sin_E, cos_E): (f32, f32)) -> Vector3<f32> {
 		let (a, e, e_root) = (self.a, self.e, self.e_root);
-		let r_orb = Vector2::new(a * (cos_E - e), a * e_root * sin_E);
+		let r_orb = Vector2::from([a * (cos_E - e), a * e_root * sin_E]);
 		self.orb_to_ecl * r_orb
 	}
 
 	fn v_from_sin_cos_E(&self, (sin_E, cos_E): (f32, f32)) -> Vector3<f32> {
 		let (a, e, e_root) = (self.a, self.e, self.e_root);
 		let v_mult: f32 = self.speed_root / (1.0 - e * cos_E);
-		let v_orb = Vector2::new(-v_mult * sin_E, v_mult * e_root * cos_E);
+		let v_orb = Vector2::from([-v_mult * sin_E, v_mult * e_root * cos_E]);
 		self.orb_to_ecl * v_orb
 	}
 
@@ -128,13 +130,14 @@ impl Orbit {
 		let (sin_i, cos_i) = i.sin_cos();
 		let (sin_Omega, cos_Omega) = Omega.sin_cos();
 		let (sin_omega, cos_omega) = omega.sin_cos();
-		Matrix3x2::new(
+		let arr = [
 			  cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
 			- cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i,
 			  sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
 			- sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i,
 			  sin_omega * sin_i,
 			  cos_omega * sin_i
-		)
+		];
+		Matrix3x2::from_row_slice(&arr)
 	}
 }
