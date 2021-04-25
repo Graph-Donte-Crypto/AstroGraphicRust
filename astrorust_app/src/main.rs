@@ -1,5 +1,6 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_lib as lib;
+use gui_lib::kiss3d;
 use gui_lib::kiss3d::{
 	light::Light,
 	window::Window,
@@ -11,7 +12,7 @@ use std::f32::consts::PI;
 fn main() {
 	let mut window = Window::new("Astro Graphic Rust");
 
-	let mut sphere = window.add_sphere(1.0);
+	let mut sphere = window.add_sphere(-1.0);
 	let mut planet = window.add_sphere(0.2);
 
 	planet.set_color(0.6, 0.6, 0.6);
@@ -31,7 +32,7 @@ fn main() {
 	while window.render_with_camera(&mut camera) {
 		planet.set_local_translation(Translation3 { vector: points[index].coords });
 		gui_lib::draw_orbit_points(&mut window, &points, &Point3::from([1.0, 1.0, 1.0]));
-		gui_lib::draw_full_axes(&mut window, 100_f32);
+		gui_lib::draw_full_axes(&mut window, 100_f32, 1_f32);
 		sphere.prepend_to_local_rotation(&rot);
 		//planet.set_local_translation(Translation3::new(20.0 * angle.cos(), 20.0 * angle.sin(), 0.0));
 		//angle += PI / 180.0;
