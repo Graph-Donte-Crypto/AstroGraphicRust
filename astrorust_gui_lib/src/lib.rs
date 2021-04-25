@@ -28,11 +28,19 @@ impl Drawable for Orbit {
 			nu += TAU / (count as f32);
 		}
 		points
+pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f32>> {
+	let mut nu: f32 = 0.0;
+	let mut points = Vec::with_capacity(count);
+	let d_nu =  TAU / (count as f32);
+	for _ in 0..count-1 {
+		let point = Point3::from(orbit.r_from_nu(nu));
+		points.push(point);
+		nu += d_nu;
 	}
+	return points;
 }
 
-pub fn draw_orbit(window: &mut kiss3d::window::Window, orbit: &Orbit, color: &Point3<f32>) {
-	let points = orbit.generate_points(100);
+pub fn draw_orbit_points(window: &mut kiss3d::window::Window, points: &Vec<Point3<f32>>, color: &Point3<f32>) {
 	for i in 0..points.len() - 1 {
 		window.draw_line(&(points[i]), &(points[i + 1]), &color);
 	}
