@@ -1,7 +1,7 @@
 // #[macro_use(lazy_static)]
 // extern crate lazy_static;
 
-pub use nalgebra;
+pub use kiss3d::nalgebra as na;
 pub use kiss3d;
 
 use core::f32::consts::TAU;
@@ -11,7 +11,7 @@ use kiss3d::{
 	nalgebra as na,
 	window::Window
 };
-use na::{Point3, Translation3, UnitQuaternion, Vector3};
+use na::{Point3};
 use astrorust_lib::orbit::Orbit;
 
 pub trait Drawable {
