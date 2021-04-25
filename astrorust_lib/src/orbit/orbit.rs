@@ -1,12 +1,9 @@
 #![allow(non_snake_case)]
 
 use core::f32::consts::TAU;
-use num_traits::real::Real;
-use typenum::{int::Z0, P3, N2};
 use nalgebra::{Matrix3x2, Vector2, Vector3};
 
 #[derive(Builder, Getters, Setters, Debug)]
-#[allow(non_snake_case)]
 pub struct Orbit {
 	#[getset(get = "pub")]
 	mu: f32,
@@ -24,7 +21,6 @@ pub struct Orbit {
 
 	#[getset(get = "pub")]
 	#[builder(default)]
-	#[allow(non_snake_case)]
 	Omega: f32,
 
 	#[getset(get = "pub")]
@@ -33,7 +29,6 @@ pub struct Orbit {
 
 	#[getset(get = "pub")]
 	#[builder(default)]
-	#[allow(non_snake_case)]
 	M0: f32,
 
 	#[getset(get = "pub")]
@@ -47,7 +42,6 @@ pub struct Orbit {
 	orb_to_ecl: Matrix3x2<f32>,
 }
 
-#[allow(non_snake_case)]
 impl Orbit {
 	pub fn new(mu: f32, a: f32, e: f32, i: f32, Omega: f32, omega: f32, M0: f32) -> Self {
 		let speed_root = (mu / a).sqrt();
@@ -112,13 +106,13 @@ impl Orbit {
 	}
 
 	fn v_from_sin_cos_E(&self, (sin_E, cos_E): (f32, f32)) -> Vector3<f32> {
-		let (a, e, e_root) = (self.a, self.e, self.e_root);
+		let (e, e_root) = (self.e, self.e_root);
 		let v_mult: f32 = self.speed_root / (1.0 - e * cos_E);
 		let v_orb = Vector2::from([-v_mult * sin_E, v_mult * e_root * cos_E]);
 		self.orb_to_ecl * v_orb
 	}
 
-	fn E_from_M(&self, M: f32) -> f32 {
+	fn E_from_M(&self, _M: f32) -> f32 {
 		unimplemented!()
 	}
 
