@@ -5,7 +5,6 @@ use num_traits::real::Real;
 use typenum::{int::Z0, P3, N2};
 use nalgebra::{Matrix3x2, Vector2, Vector3, base::Scalar};
 
-type MuDimension = uom::si::ISQ<P3, Z0, N2, Z0, Z0, Z0, Z0, dyn uom::Kind>;
 
 #[derive(Getters, Builder, Debug)]
 #[allow(non_snake_case)]
