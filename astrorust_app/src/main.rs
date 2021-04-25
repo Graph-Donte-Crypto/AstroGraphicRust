@@ -24,8 +24,6 @@ fn main() {
 	let orbit = lib::orbit::Orbit::new(1172.3328, 5.263138, 0.2, 7_f32.to_radians(), 15_f32.to_radians(), 70_f32.to_radians(), 0_f32.to_radians());
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
-	let rho = 0;
-	
 
 	let mut camera =
 		kiss3d::camera::ArcBall::new(Point3::from([-1.0, -1.0, -1.0]), Point3::from([0.0, 0.0, 0.0]));
@@ -37,10 +35,9 @@ fn main() {
 
 	camera.rebind_rotate_button(Some(MouseButton::Button2));
 	camera.rebind_drag_button(None);
-	//window.render_with_camera()
+
 	let mut index = 0_usize;
 	while window.render_with_camera(&mut camera) {
-		//vec[index]));
 		planet.set_local_translation(Translation3 { vector: points[index].coords });
 		gui_lib::draw_orbit_points(&mut window, &points, &Point3::from([1.0, 1.0, 1.0]));
 		gui_lib::draw_full_axes(&mut window, 100_f32);
