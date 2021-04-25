@@ -1,6 +1,12 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_lib as lib;
-use gui_lib::kiss3d::{self, event::{Action, MouseButton, WindowEvent}, light::Light, nalgebra as na, window::Window};
+use gui_lib::kiss3d::{
+	self,
+	event::{Action, MouseButton, WindowEvent},
+	light::Light,
+	nalgebra as na,
+	window::Window,
+};
 use na::{Point3, UnitQuaternion, Translation3, Vector3};
 use std::{f32::consts::PI};
 
@@ -15,14 +21,25 @@ fn main() {
 	sphere.set_color(1.0, 1.0, 0.0);
 	//window.set_light(Light::StickToCamera);
 	window.set_light(Light::Absolute(Point3::from([0.0, 0.0, 0.0])));
-	
+
 	let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.014);
-	let orbit = lib::orbit::Orbit::new(1172.3328, 5.263138, 0.2, 7_f32.to_radians(), 15_f32.to_radians(), 70_f32.to_radians(), 0_f32.to_radians());
+	let orbit = lib::orbit::Orbit::new(
+		1172.3328,
+		5.263138,
+		0.2,
+		7_f32.to_radians(),
+		15_f32.to_radians(),
+		70_f32.to_radians(),
+		0_f32.to_radians(),
+	);
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
 
-	let mut camera =
-		gui_lib::kiss3d_trackball::Trackball::new(&Point3::from([10.0, 10.0, 10.0]), &Point3::origin(), &Vector3::from([0.0, 0.0, PI]));
+	let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
+		&Point3::from([10.0, 10.0, 10.0]),
+		&Point3::origin(),
+		&Vector3::from([0.0, 0.0, PI]),
+	);
 
 	camera.input.rebind_slide_button(Some(MouseButton::Button3));
 	camera.input.rebind_orbit_button(Some(MouseButton::Button2));
