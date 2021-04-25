@@ -1,12 +1,10 @@
-// #[macro_use(lazy_static)]
-// extern crate lazy_static;
-
 pub use kiss3d::nalgebra as na;
 pub use kiss3d;
+pub use kiss3d_trackball;
+
 use core::f32::consts::TAU;
 use na::{Point3};
 use astrorust_lib::orbit::Orbit;
-
 
 pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f32>> {
 	let mut nu: f32 = 0.0;
