@@ -18,8 +18,7 @@ fn main() {
 	planet.set_color(0.6, 0.6, 0.6);
 	sphere.set_color(1.0, 1.0, 0.0);
 	//window.set_light(Light::StickToCamera);
-	window.set_light(Light::Absolute(Point3::from([3.0, 3.0, 3.0])));
-	window.set_light(Light::Absolute(Point3::from([-3.0, -3.0, -3.0])));
+	window.set_light(Light::Absolute(Point3::from([0.0, 0.0, 0.0])));
 	
 	let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.014);
 	let orbit = lib::orbit::Orbit::new(1172.3328, 5.263138, 0.2, 7_f32.to_radians(), 15_f32.to_radians(), 70_f32.to_radians(), 0_f32.to_radians());
