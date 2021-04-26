@@ -9,6 +9,7 @@ name = "astrorust_lib"
 path = "src/lib.rs"
 
 [dependencies]
+dimensioned = "0.7.0"
 getset = "0.1.1"
 nalgebra = "0.26.1"
 num-traits = "0.2.14"
