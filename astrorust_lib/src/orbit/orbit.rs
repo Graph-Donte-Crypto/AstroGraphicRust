@@ -36,13 +36,13 @@ pub struct Orbit {
 
 	// pre-computed
 	#[builder(setter(skip), default_code = "(mu / a).sqrt()")]
-	speed_root: f32, // sqrt(mu / a)
+	speed_root: f32,  // sqrt(mu / a)
 
 	#[builder(setter(skip), default_code = "speed_root / a")]
 	mean_motion: f32, // sqrt(mu / a^3)
 
 	#[builder(setter(skip), default_code = "(1.0 - e * e).sqrt()")]
-	e_root: f32, // sqrt(1 - e^2)
+	e_root: f32,      // sqrt(1 - e^2)
 
 	// matrix to transform vectors from orbital to ecliptic coordinates
 	#[builder(setter(skip), default_code = "Orbit::compute_orb_to_ecl(i, Omega, omega)")]

@@ -25,6 +25,7 @@ fn main() {
 		.Omega(15_f32.to_radians())
 		.omega(70_f32.to_radians())
 		.build();
+	dbg!(&orbit);
 
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
