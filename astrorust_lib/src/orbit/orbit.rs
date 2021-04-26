@@ -49,6 +49,24 @@ pub struct Orbit {
 	orb_to_ecl: Matrix3x2<f32>,
 }
 
+trait OrbitDeg<'a> {
+	fn i_deg(&'a mut self, i: f32) -> &'a mut Self;
+	fn Omega_deg(&'a mut self, Omega: f32) -> &'a mut Self;
+	fn omega_deg(&'a mut self, omega: f32) -> &'a mut Self;
+}
+
+impl<'a, T> OrbitDeg<'a> for OrbitBuilder<T> {
+	fn i_deg(&'a mut self, i: f32) -> &'a mut Self {
+		self
+	}
+	fn Omega_deg(&'a mut self, Omega: f32) -> &'a mut Self {
+		self
+	}
+	fn omega_deg(&'a mut self, omega: f32) -> &'a mut Self {
+		self
+	}
+}
+
 impl Orbit {
 	pub fn r_from_nu(&self, nu: f32) -> Vector3<f32> {
 		let (e, e_root) = (self.e, self.e_root);
