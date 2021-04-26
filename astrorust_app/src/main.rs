@@ -1,11 +1,6 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_lib as lib;
-use gui_lib::kiss3d::{
-	event::MouseButton,
-	light::Light,
-	nalgebra as na,
-	window::Window,
-};
+use gui_lib::kiss3d::{event::MouseButton, light::Light, nalgebra as na, window::Window};
 use na::{Point3, UnitQuaternion, Translation3, Vector3};
 use core::f32::consts::PI;
 
