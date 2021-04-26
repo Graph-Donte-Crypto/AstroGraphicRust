@@ -22,15 +22,16 @@ fn main() {
 	window.set_light(Light::Absolute(Point3::from([0.0, 0.0, 0.0])));
 
 	let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.014);
-	let orbit = lib::orbit::Orbit::new(
-		1172.3328,
-		5.263138,
-		0.2,
-		7_f32.to_radians(),
-		15_f32.to_radians(),
-		70_f32.to_radians(),
-		0_f32.to_radians(),
-	);
+	let orbit = lib::orbit::Orbit::builder()
+		.mu(1172.3328)
+		.a(5.263138)
+		.e(0.2)
+		.i(7_f32.to_radians())
+		.Omega(15_f32.to_radians())
+		.omega(70_f32.to_radians())
+		.build();
+	dbg!(&orbit);
+
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
 
