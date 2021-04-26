@@ -13,13 +13,13 @@ use core::f32::consts::PI;
 fn main() {
 	let mut window = Window::new("Astro Graphic Rust");
 
-	// kiss3d supports only single point lightsource, so we place it in the center of the star.
+	// kiss3d supports only one point lightsource, so we place it in the center of the star.
 	// Negative radius turns the sphere inside out, so the light can pass outside
 	let mut sphere = window.add_sphere(-1.0);
 	let mut planet = window.add_sphere(0.2);
 	planet.set_color(0.6, 0.6, 0.6);
 	sphere.set_color(1.0, 1.0, 0.0);
-	window.set_light(Light::Absolute(Point3::from([0.0, 0.0, 0.0])));
+	window.set_light(Light::Absolute(Point3::origin()));
 
 	let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.014);
 	let orbit = lib::orbit::Orbit::builder()
@@ -30,7 +30,6 @@ fn main() {
 		.Omega(15_f32.to_radians())
 		.omega(70_f32.to_radians())
 		.build();
-	dbg!(&orbit);
 
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
@@ -48,7 +47,7 @@ fn main() {
 	while window.render_with_camera(&mut camera) {
 		planet.set_local_translation(Translation3 { vector: points[index].coords });
 		gui_lib::draw_orbit_points(&mut window, &points, &Point3::from([1.0, 1.0, 1.0]));
-		gui_lib::draw_full_axes(&mut window, 100_f32, 1_f32);
+		gui_lib::draw_full_axes(&mut window, 100.0, 1.0);
 		sphere.prepend_to_local_rotation(&rot);
 		index = (index + 1) % points.len();
 	}
