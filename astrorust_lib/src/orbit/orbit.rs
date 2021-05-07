@@ -99,24 +99,25 @@ impl Orbit {
 	}
 
 	fn E_from_M(&self, _M: f32) -> f32 {
-		unimplemented!()
+		todo!()
 	}
 
 	fn M_from_t(&self, t: f32) -> f32 {
 		(t / self.period) * TAU
 	}
 
+	#[rustfmt::skip]
 	fn compute_orb_to_ecl(i: f32, Omega: f32, omega: f32) -> Matrix3x2<f32> {
 		let (sin_i, cos_i) = i.sin_cos();
 		let (sin_Omega, cos_Omega) = Omega.sin_cos();
 		let (sin_omega, cos_omega) = omega.sin_cos();
 		let arr = [
-			cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
+			 cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
 			-cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i,
-			sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
+			 sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
 			-sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i,
-			sin_omega * sin_i,
-			cos_omega * sin_i,
+			 sin_omega * sin_i,
+			 cos_omega * sin_i,
 		];
 		Matrix3x2::from_row_slice(&arr)
 	}
