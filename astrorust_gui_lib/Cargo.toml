@@ -10,6 +10,6 @@ path = "src/lib.rs"
 
 [dependencies]
 astrorust_lib = { path = "../astrorust_lib" }
-kiss3d = "0.31.0"
-kiss3d-trackball = "0.2.0"
+kiss3d = {git = "https://github.com/Graph-Donte-Crypto/kiss3d"}
+kiss3d-trackball = {git = "https://github.com/Graph-Donte-Crypto/kiss3d-trackball"}
 lazy_static = "1.4.0"
