@@ -1,10 +1,37 @@
 pub use kiss3d::nalgebra as na;
 pub use kiss3d;
+use kiss3d::nalgebra::{Matrix3, UnitVector3};
 pub use kiss3d_trackball;
 
 use core::f32::consts::TAU;
-use na::{Point3};
-use astrorust_lib::orbit::Orbit;
+use na::{Point3, Vector3};
+use astrorust_lib::{orbit::Orbit};
+
+pub struct SpaceBody {
+	pub body: kiss3d::scene::SceneNode,
+	pub radius: f32,
+}
+
+impl SpaceBody {
+	pub fn new(window: &mut kiss3d::window::Window, r: f32) -> SpaceBody {
+		return SpaceBody {
+			body: window.add_sphere(r),
+			radius: r.abs()
+		};
+	}
+
+	pub fn ui_mouse_check(&self, mouse_point: Point3<f32>, mouse_vector: Vector3<f32>) -> bool {
+		let real_eye = mouse_point - self.pos();
+		let a = mouse_vector.dot(&mouse_vector);
+		let b = real_eye.coords.dot(&mouse_vector) * 2.0;
+		let c = real_eye.coords.dot(&real_eye.coords) - self.radius.powi(2);
+		let d = b * b - 4.0 * a * c;
+		return d >= 0.0;
+	}
+	pub fn pos(&self) -> Vector3::<f32> {
+		return self.body.data().local_translation().vector;
+	}
+}
 
 pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f32>> {
 	let mut nu: f32 = 0.0;
