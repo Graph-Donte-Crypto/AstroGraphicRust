@@ -1,0 +1,83 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'astrorust_app'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=astrorust_app",
+					"--package=astrorust_app"
+				],
+				"filter": {
+					"name": "astrorust_app",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'astrorust_app'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=astrorust_app",
+					"--package=astrorust_app"
+				],
+				"filter": {
+					"name": "astrorust_app",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'astrorust_gui_lib'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=astrorust_gui_lib"
+				],
+				"filter": {
+					"name": "astrorust_gui_lib",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'astrorust_lib'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=astrorust_lib"
+				],
+				"filter": {
+					"name": "astrorust_lib",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}
