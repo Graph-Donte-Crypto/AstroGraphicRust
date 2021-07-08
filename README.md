@@ -4,6 +4,6 @@
 
 A Project for visualization of interplanetary trajectories with gravity assists
 
-Проект по визуализации траекторий межпланетных траекторий с гравитационными манёврами
+Проект по визуализации межпланетных траекторий с гравитационными манёврами
 
 ![alt text](https://github.com/Graph-Donte-Crypto/AstroGraphicRust/blob/master/images/AstroGraphicRust_Example1.png?raw=true)
