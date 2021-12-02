@@ -3,7 +3,7 @@
 use core::f32::consts::TAU;
 use nalgebra::{Matrix3x2, Vector2, Vector3};
 
-#[derive(TypedBuilder, Getters, Setters, Debug)]
+#[derive(Builder, Getters, Setters, Debug)]
 pub struct Orbit {
 	#[getset(get = "pub")]
 	mu: f32,
@@ -31,7 +31,7 @@ pub struct Orbit {
 	#[builder(default)]
 	M0: f32,
 
-	#[builder(setter(skip), default)]
+	#[getset(get = "pub")]
 	period: f32, // orbital period
 
 	// pre-computed
@@ -45,11 +45,31 @@ pub struct Orbit {
 	e_root: f32,      // sqrt(1 - e^2)
 
 	// matrix to transform vectors from orbital to ecliptic coordinates
-	#[builder(setter(skip), default_code = "Orbit::compute_orb_to_ecl(i, Omega, omega)")]
 	orb_to_ecl: Matrix3x2<f32>,
 }
 
 impl Orbit {
+	pub fn new(mu: f32, a: f32, e: f32, i: f32, Omega: f32, omega: f32, M0: f32) -> Self {
+		let speed_root = (mu / a).sqrt();
+		let mean_motion = speed_root / a;
+		let period = a / speed_root;
+		let e_root = (1.0 - e * e).sqrt();
+		Orbit {
+			mu,
+			a,
+			e,
+			i,
+			Omega,
+			omega,
+			M0,
+			speed_root,
+			mean_motion,
+			period,
+			e_root,
+			orb_to_ecl: Self::orb_to_ecl(i, Omega, omega),
+		}
+	}
+
 	pub fn r_from_nu(&self, nu: f32) -> Vector3<f32> {
 		let (e, e_root) = (self.e, self.e_root);
 		let (sin_nu, cos_nu) = nu.sin_cos();
@@ -106,7 +126,7 @@ impl Orbit {
 		(t / self.period) * TAU
 	}
 
-	fn compute_orb_to_ecl(i: f32, Omega: f32, omega: f32) -> Matrix3x2<f32> {
+	fn orb_to_ecl(i: f32, Omega: f32, omega: f32) -> Matrix3x2<f32> {
 		let (sin_i, cos_i) = i.sin_cos();
 		let (sin_Omega, cos_Omega) = Omega.sin_cos();
 		let (sin_omega, cos_omega) = omega.sin_cos();

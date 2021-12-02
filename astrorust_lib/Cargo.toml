@@ -9,8 +9,8 @@ name = "astrorust_lib"
 path = "src/lib.rs"
 
 [dependencies]
+derive_builder = "0.10.2"
 getset = "0.1.1"
 nalgebra = "0.26.1"
 num-traits = "0.2.14"
-typed-builder = "0.9.0"
 typenum = "1.14.0"
