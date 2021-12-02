@@ -4,80 +4,71 @@ use core::f32::consts::TAU;
 use nalgebra::{Matrix3x2, Vector2, Vector3};
 
 #[derive(Builder, Getters, Setters, Debug)]
+#[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit {
 	#[getset(get = "pub")]
+    #[builder(setter(name = "std_grav_param"))]
 	mu: f32,
 
 	#[getset(get = "pub")]
+    #[builder(setter(name = "semi_major_axis"))]
 	a: f32,
 
 	#[getset(get = "pub")]
-	#[builder(default)]
+	#[builder(default, setter(name = "eccentricity"))]
 	e: f32,
 
 	#[getset(get = "pub")]
-	#[builder(default)]
+	#[builder(default, setter(name = "inclination"))]
 	i: f32,
 
 	#[getset(get = "pub")]
-	#[builder(default)]
+	#[builder(default, setter(name = "long_of_asc_node"))]
 	Omega: f32,
 
 	#[getset(get = "pub")]
-	#[builder(default)]
+	#[builder(default, setter(name = "arg_of_periapsis"))]
 	omega: f32,
 
 	#[getset(get = "pub")]
-	#[builder(default)]
+	#[builder(default, setter(name = "mean_anomaly_at_t0"))]
 	M0: f32,
 
 	#[getset(get = "pub")]
+    #[builder(setter(skip))]
 	period: f32, // orbital period
 
 	// pre-computed
-	#[builder(setter(skip), default_code = "(mu / a).sqrt()")]
+	#[builder(setter(skip), default = "(self.mu.unwrap() / self.a.unwrap()).sqrt()")]
 	speed_root: f32,  // sqrt(mu / a)
 
-	#[builder(setter(skip), default_code = "speed_root / a")]
+	#[builder(setter(skip), default = "(self.mu.unwrap() / self.a.unwrap().powi(3)).sqrt()")]
 	mean_motion: f32, // sqrt(mu / a^3)
 
-	#[builder(setter(skip), default_code = "(1.0 - e * e).sqrt()")]
+	#[builder(setter(skip), default = "(1.0 - self.e.unwrap().powi(2)).sqrt()")]
 	e_root: f32,      // sqrt(1 - e^2)
 
-	// matrix to transform vectors from orbital to ecliptic coordinates
+	/// Matrix to transform vectors from orbital to ecliptic coordinates
+    #[builder(setter(skip), default =
+        "Orbit::compute_orb_to_ecl(self.i.unwrap(), self.Omega.unwrap(), self.omega.unwrap())"
+    )]
 	orb_to_ecl: Matrix3x2<f32>,
 }
 
-impl Orbit {
-	pub fn new(mu: f32, a: f32, e: f32, i: f32, Omega: f32, omega: f32, M0: f32) -> Self {
-		let speed_root = (mu / a).sqrt();
-		let mean_motion = speed_root / a;
-		let period = a / speed_root;
-		let e_root = (1.0 - e * e).sqrt();
-		Orbit {
-			mu,
-			a,
-			e,
-			i,
-			Omega,
-			omega,
-			M0,
-			speed_root,
-			mean_motion,
-			period,
-			e_root,
-			orb_to_ecl: Self::orb_to_ecl(i, Omega, omega),
-		}
-	}
+impl OrbitBuilder {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
 
+impl Orbit {
 	pub fn r_from_nu(&self, nu: f32) -> Vector3<f32> {
 		let (e, e_root) = (self.e, self.e_root);
 		let (sin_nu, cos_nu) = nu.sin_cos();
 		let inv_denominator = 1.0 / (e.mul_add(cos_nu, 1.0));
 		let sin_E = e_root * sin_nu * inv_denominator;
 		let cos_E = (e + cos_nu) * inv_denominator;
-		self.r_from_sin_cos_E((sin_E, cos_E))
-	}
+		self.r_from_sin_cos_E((sin_E, cos_E)) }
 
 	pub fn r_and_v_from_nu(&self, nu: f32) -> (Vector3<f32>, Vector3<f32>) {
 		let (e, e_root) = (self.e, self.e_root);
@@ -126,7 +117,7 @@ impl Orbit {
 		(t / self.period) * TAU
 	}
 
-	fn orb_to_ecl(i: f32, Omega: f32, omega: f32) -> Matrix3x2<f32> {
+	fn compute_orb_to_ecl(i: f32, Omega: f32, omega: f32) -> Matrix3x2<f32> {
 		let (sin_i, cos_i) = i.sin_cos();
 		let (sin_Omega, cos_Omega) = Omega.sin_cos();
 		let (sin_omega, cos_omega) = omega.sin_cos();
@@ -140,4 +131,12 @@ impl Orbit {
 		];
 		Matrix3x2::from_row_slice(&arr)
 	}
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+        
+    }
 }

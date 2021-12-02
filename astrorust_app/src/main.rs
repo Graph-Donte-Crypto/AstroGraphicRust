@@ -17,27 +17,28 @@ fn main() {
 	window.set_light(Light::Absolute(Point3::origin()));
 
 	let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.014);
-	let orbit = lib::orbit::Orbit::builder()
-		.mu(1172.3328)
-		.a(5.263138)
-		.e(0.2)
-		.i(7_f32.to_radians())
-		.Omega(15_f32.to_radians())
-		.omega(70_f32.to_radians())
-		.build();
+	let orbit = lib::orbit::OrbitBuilder::default()
+		.std_grav_param(1172.3328)
+		.semi_major_axis(5.263138)
+		.eccentricity(0.2)
+		.inclination(7_f32.to_radians())
+		.long_of_asc_node(15_f32.to_radians())
+		.arg_of_periapsis(70_f32.to_radians())
+		.build()
+        .unwrap();
 	dbg!(&orbit);
 
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
 	window.set_line_width(1.0);
 
 	let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
-		&Point3::from([10.0, 10.0, 10.0]),
+		Point3::from([10.0, 10.0, 10.0]),
 		&Point3::origin(),
 		&Vector3::from([0.0, 0.0, PI]),
 	);
 
-	camera.input.rebind_slide_button(Some(MouseButton::Button3));
-	camera.input.rebind_orbit_button(Some(MouseButton::Button2));
+	//camera.input.rebind_slide_button(Some(MouseButton::Button3));
+	//camera.input.rebind_orbit_button(Some(MouseButton::Button2));
 
 	let mut index = 0_usize;
 	while window.render_with_camera(&mut camera) {
