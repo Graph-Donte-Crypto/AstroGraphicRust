@@ -6,11 +6,13 @@ use core::f32::consts::PI;
 
 #[allow(non_snake_case)]
 fn main() {
+    const SPHERE_RADIUS: f32 = 1.0;
+
 	let mut window = Window::new("Astro Graphic Rust");
 
 	// kiss3d supports only one point lightsource, so we place it in the center of the star.
 	// Negative radius turns the sphere inside out, so the light can pass outside
-	let mut sphere = window.add_sphere(-1.0);
+	let mut sphere = window.add_sphere(-SPHERE_RADIUS);
 	let mut planet = window.add_sphere(0.2);
 	planet.set_color(0.6, 0.6, 0.6);
 	sphere.set_color(1.0, 1.0, 0.0);
@@ -32,7 +34,7 @@ fn main() {
 	window.set_line_width(1.0);
 
 	let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
-		Point3::from([10.0, 10.0, 10.0]),
+		&Point3::from([10.0, 10.0, 10.0]),
 		&Point3::origin(),
 		&Vector3::from([0.0, 0.0, PI]),
 	);
@@ -44,7 +46,7 @@ fn main() {
 	while window.render_with_camera(&mut camera) {
 		planet.set_local_translation(Translation3 { vector: points[index].coords });
 		gui_lib::draw_orbit_points(&mut window, &points, &Point3::from([1.0, 1.0, 1.0]));
-		gui_lib::draw_full_axes(&mut window, 100.0, 1.0);
+		gui_lib::draw_full_axes(&mut window, 100.0, SPHERE_RADIUS);
 		sphere.prepend_to_local_rotation(&rot);
 		index = (index + 1) % points.len();
 	}
