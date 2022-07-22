@@ -1,0 +1,111 @@
+[star]
+name = "Kerbol"
+std_grav_param = 1.1723328e9
+radius = 2616000.0
+atmosphere_height = 600.0
+rotation_period = 432000.0
+
+[[planet]]
+name = "Moho"
+std_grav_param = 1.6860938e2
+radius = 250.0
+atmosphere_height = 0.0
+rotation_period = 121000.0
+orbit = {
+    semi_major_axis = 5.263138304e6
+    eccentricity = 0.2
+    inclination = 7.0
+    longitude_of_the_an = 70.0
+    arg_of_periapsis = 15.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Eve"
+std_grav_param = 8.1717302e3
+radius = 700.0
+atmosphere_height = 90.0
+rotation_period = 80500.0
+orbit = {
+    semi_major_axis = 9.832684544e6
+    eccentricity = 0.01
+    inclination = 2.1
+    longitude_of_the_an = 15.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Kerbin"
+std_grav_param = 3.5316e3
+radius = 600.0
+atmosphere_height = 70.0
+rotation_period = 21549.425
+orbit = {
+    semi_major_axis = 1.3599840256e7
+    eccentricity = 0.0
+    inclination = 0.0
+    longitude_of_the_an = 0.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Duna"
+std_grav_param = 3.0136321e2
+radius = 320.0
+atmosphere_height = 50.0
+rotation_period = 65517.859
+orbit = {
+    semi_major_axis = 2.0726155264e7
+    eccentricity = 0.051
+    inclination = 0.06
+    longitude_of_the_an = 135.5
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Dres"
+std_grav_param = 2.1484489e1
+radius = 138.0
+atmosphere_height = 0.0
+rotation_period = 34800.0
+orbit = {
+    semi_major_axis = 4.0839348203e7
+    eccentricity = 0.145
+    inclination = 5.0
+    longitude_of_the_an = 280.0
+    arg_of_periapsis = 90.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Jool"
+std_grav_param = 2.82528e5
+radius = 6000.0
+atmosphere_height = 200.0
+rotation_period = 36000.0
+orbit = {
+    semi_major_axis = 6.8773560320e7
+    eccentricity = 0.05
+    inclination = 1.304
+    longitude_of_the_an = 52.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 3.14
+}
+
+[[planet]]
+name = "Eeloo"
+std_grav_param = 7.4410815e1
+radius = 210.0
+atmosphere_height = 0.0
+rotation_period = 19460.0
+orbit = {
+    semi_major_axis = 9.0118820000e7
+    eccentricity = 0.26
+    inclination = 6.15
+    longitude_of_the_an = 50.0
+    arg_of_periapsis = 260.0
+    mean_anomaly_at_t0 = 3.14
+}
