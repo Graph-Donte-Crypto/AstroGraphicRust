@@ -132,15 +132,14 @@ impl Orbit {
 		let (sin_i, cos_i) = i.sin_cos();
 		let (sin_Omega, cos_Omega) = Omega.sin_cos();
 		let (sin_omega, cos_omega) = omega.sin_cos();
-		let arr = [
+		Matrix3x2::new(
 			cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
 			-cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i,
 			sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
 			-sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i,
 			sin_omega * sin_i,
 			cos_omega * sin_i,
-		];
-		Matrix3x2::from_row_slice(&arr)
+		)
 	}
 }
 
