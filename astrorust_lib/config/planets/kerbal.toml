@@ -11,13 +11,13 @@ std_grav_param = 1.6860938e2
 radius = 250.0
 atmosphere_height = 0.0
 rotation_period = 121000.0
-    [planet.orbit]
-    semi_major_axis = 5.263138304e6
-    eccentricity = 0.2
-    inclination = 7.0
-    longitude_of_the_an = 70.0
-    arg_of_periapsis = 15.0
-    mean_anomaly_at_t0 = 3.14
+  [planet.orbit]
+  semi_major_axis = 5.263138304e6
+  eccentricity = 0.2
+  inclination = 7.0
+  longitude_of_the_an = 70.0
+  arg_of_periapsis = 15.0
+  mean_anomaly_at_t0 = 3.14
 
 [[planet]]
 name = "Eve"
@@ -25,27 +25,27 @@ std_grav_param = 8.1717302e3
 radius = 700.0
 atmosphere_height = 90.0
 rotation_period = 80500.0
-    [planet.orbit]
-    semi_major_axis = 9.832684544e6
-    eccentricity = 0.01
-    inclination = 2.1
-    longitude_of_the_an = 15.0
-    arg_of_periapsis = 0.0
-    mean_anomaly_at_t0 = 3.14
+  [planet.orbit]
+  semi_major_axis = 9.832684544e6
+  eccentricity = 0.01
+  inclination = 2.1
+  longitude_of_the_an = 15.0
+  arg_of_periapsis = 0.0
+  mean_anomaly_at_t0 = 3.14
 
-    [[planet.moon]]
-    name = "Gilly"
-    std_grav_param = 82894498e-3
-    radius = 13.0
-    atmosphere_height = 0.0
-    rotation_period = 28255.0
-        [moon.orbit]
-        semi_major_axis = 3.15e4
-        eccentricity = 0.55
-        inclination = 12.0
-        longitude_of_the_an = 80.0
-        arg_of_periapsis = 10.0
-        mean_anomaly_at_t0 = 0.9
+  [[planet.moon]]
+  name = "Gilly"
+  std_grav_param = 82894498e-3
+  radius = 13.0
+  atmosphere_height = 0.0
+  rotation_period = 28255.0
+    [planet.moon.orbit]
+    semi_major_axis = 3.15e4
+    eccentricity = 0.55
+    inclination = 12.0
+    longitude_of_the_an = 80.0
+    arg_of_periapsis = 10.0
+    mean_anomaly_at_t0 = 0.9
 
 [[planet]]
 name = "Kerbin"
@@ -53,41 +53,41 @@ std_grav_param = 3.5316e3
 radius = 600.0
 atmosphere_height = 70.0
 rotation_period = 21549.425
-    [planet.orbit]
-    semi_major_axis = 1.3599840256e7
+  [planet.orbit]
+  semi_major_axis = 1.3599840256e7
+  eccentricity = 0.0
+  inclination = 0.0
+  longitude_of_the_an = 0.0
+  arg_of_periapsis = 0.0
+  mean_anomaly_at_t0 = 3.14
+
+  [[planet.moon]]
+  name = "Mun"
+  std_grav_param = 6.5138398e1
+  radius = 200
+  atmosphere_height = 0.0
+  rotation_period = 138984.38
+    [planet.moon.orbit]
+    semi_major_axis = 1.2e4
     eccentricity = 0.0
     inclination = 0.0
     longitude_of_the_an = 0.0
     arg_of_periapsis = 0.0
-    mean_anomaly_at_t0 = 3.14
+    mean_anomaly_at_t0 = 1.7
 
-    [[planet.moon]]
-    name = "Mun"
-    std_grav_param = 6.5138398e1
-    radius = 200
-    atmosphere_height = 0.0
-    rotation_period = 138984.38
-        [moon.orbit]
-        semi_major_axis = 1.2e4
-        eccentricity = 0.0
-        inclination = 0.0
-        longitude_of_the_an = 0.0
-        arg_of_periapsis = 0.0
-        mean_anomaly_at_t0 = 1.7
-
-    [[planet.moon]]
-    name = "Minmus"
-    std_grav_param = 1.7658
-    radius = 60.0
-    atmosphere_height = 0.0
-    rotation_period = 40400.0
-        [moon.orbit]
-        semi_major_axis = 4.7e4
-        eccentricity = 0.0
-        inclination = 6.0
-        longitude_of_the_an = 78.0
-        arg_of_periapsis = 38.0
-        mean_anomaly_at_t0 = 0.9
+  [[planet.moon]]
+  name = "Minmus"
+  std_grav_param = 1.7658
+  radius = 60.0
+  atmosphere_height = 0.0
+  rotation_period = 40400.0
+    [planet.moon.orbit]
+    semi_major_axis = 4.7e4
+    eccentricity = 0.0
+    inclination = 6.0
+    longitude_of_the_an = 78.0
+    arg_of_periapsis = 38.0
+    mean_anomaly_at_t0 = 0.9
 
 [[planet]]
 name = "Duna"
@@ -95,27 +95,27 @@ std_grav_param = 3.0136321e2
 radius = 320.0
 atmosphere_height = 50.0
 rotation_period = 65517.859
-    [planet.orbit]
-    semi_major_axis = 2.0726155264e7
-    eccentricity = 0.051
-    inclination = 0.06
-    longitude_of_the_an = 135.5
-    arg_of_periapsis = 0.0
-    mean_anomaly_at_t0 = 3.14
+  [planet.orbit]
+  semi_major_axis = 2.0726155264e7
+  eccentricity = 0.051
+  inclination = 0.06
+  longitude_of_the_an = 135.5
+  arg_of_periapsis = 0.0
+  mean_anomaly_at_t0 = 3.14
 
-    [[planet.moon]]
-    name = "Ike"
-    std_grav_param = 1.8568369e1
-    radius = 130.0
-    atmosphere_height = 0.0
-    rotation_period = 65517.862
-        [moon.orbit]
-        semi_major_axis = 3.2e3
-        eccentricity = 0.03
-        inclination = 0.2
-        longitude_of_the_an = 0.0
-        arg_of_periapsis = 0.0
-        mean_anomaly_at_t0 = 1.7
+  [[planet.moon]]
+  name = "Ike"
+  std_grav_param = 1.8568369e1
+  radius = 130.0
+  atmosphere_height = 0.0
+  rotation_period = 65517.862
+    [planet.moon.orbit]
+    semi_major_axis = 3.2e3
+    eccentricity = 0.03
+    inclination = 0.2
+    longitude_of_the_an = 0.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 1.7
 
 [[planet]]
 name = "Dres"
@@ -123,13 +123,13 @@ std_grav_param = 2.1484489e1
 radius = 138.0
 atmosphere_height = 0.0
 rotation_period = 34800.0
-    [planet.orbit]
-    semi_major_axis = 4.0839348203e7
-    eccentricity = 0.145
-    inclination = 5.0
-    longitude_of_the_an = 280.0
-    arg_of_periapsis = 90.0
-    mean_anomaly_at_t0 = 3.14
+  [planet.orbit]
+  semi_major_axis = 4.0839348203e7
+  eccentricity = 0.145
+  inclination = 5.0
+  longitude_of_the_an = 280.0
+  arg_of_periapsis = 90.0
+  mean_anomaly_at_t0 = 3.14
 
 [[planet]]
 name = "Jool"
@@ -137,83 +137,83 @@ std_grav_param = 2.82528e5
 radius = 6000.0
 atmosphere_height = 200.0
 rotation_period = 36000.0
-    [planet.orbit]
-    semi_major_axis = 6.8773560320e7
-    eccentricity = 0.05
-    inclination = 1.304
-    longitude_of_the_an = 52.0
+  [planet.orbit]
+  semi_major_axis = 6.8773560320e7
+  eccentricity = 0.05
+  inclination = 1.304
+  longitude_of_the_an = 52.0
+  arg_of_periapsis = 0.0
+  mean_anomaly_at_t0 = 3.14
+
+  [[planet.moon]]
+  name = "Laythe"
+  std_grav_param = 1.962e3
+  radius = 500.0
+  atmosphere_height = 50.0
+  rotation_period = 52980.879
+    [planet.moon.orbit]
+    semi_major_axis = 2.7184e3
+    eccentricity = 0.0
+    inclination = 0.0
+    longitude_of_the_an = 0.0
     arg_of_periapsis = 0.0
     mean_anomaly_at_t0 = 3.14
 
-    [[planet.moon]]
-    name = "Laythe"
-    std_grav_param = 1.962e3
-    radius = 500.0
-    atmosphere_height = 50.0
-    rotation_period = 52980.879
-        [moon.orbit]
-        semi_major_axis = 2.7184e3
-        eccentricity = 0.0
-        inclination = 0.0
-        longitude_of_the_an = 0.0
-        arg_of_periapsis = 0.0
-        mean_anomaly_at_t0 = 3.14
+  [[planet.moon]]
+  name = "Vall"
+  std_grav_param = 2.074815e2
+  radius = 300.0
+  atmosphere_height = 0.0
+  rotation_period = 105962.09
+    [planet.moon.orbit]
+    semi_major_axis = 4.3152e3
+    eccentricity = 0.0
+    inclination = 0.0
+    longitude_of_the_an = 0.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 0.9
 
-    [[planet.moon]]
-    name = "Vall"
-    std_grav_param = 2.074815e2
-    radius = 300.0
-    atmosphere_height = 0.0
-    rotation_period = 105962.09
-        [moon.orbit]
-        semi_major_axis = 4.3152e3
-        eccentricity = 0.0
-        inclination = 0.0
-        longitude_of_the_an = 0.0
-        arg_of_periapsis = 0.0
-        mean_anomaly_at_t0 = 0.9
+  [[planet.moon]]
+  name = "Tylo"
+  std_grav_param = 2.82528e3
+  radius = 600.0
+  atmosphere_height = 0.0
+  rotation_period = 211926.36
+    [planet.moon.orbit]
+    semi_major_axis = 6.85e4
+    eccentricity = 0.0
+    inclination = 0.025
+    longitude_of_the_an = 0.0
+    arg_of_periapsis = 0.0
+    mean_anomaly_at_t0 = 3.14
 
-    [[planet.moon]]
-    name = "Tylo"
-    std_grav_param = 2.82528e3
-    radius = 600.0
-    atmosphere_height = 0.0
-    rotation_period = 211926.36
-        [moon.orbit]
-        semi_major_axis = 6.85e4
-        eccentricity = 0.0
-        inclination = 0.025
-        longitude_of_the_an = 0.0
-        arg_of_periapsis = 0.0
-        mean_anomaly_at_t0 = 3.14
+  [[planet.moon]]
+  name = "Bop"
+  std_grav_param = 2.4868349
+  radius = 65.0
+  atmosphere_height = 0.0
+  rotation_period = 544507.43
+    [planet.moon.orbit]
+    semi_major_axis = 1.285e5
+    eccentricity = 0.235
+    inclination = 15.0
+    longitude_of_the_an = 10.0
+    arg_of_periapsis = 25.0
+    mean_anomaly_at_t0 = 0.9
 
-    [[planet.moon]]
-    name = "Bop"
-    std_grav_param = 2.4868349
-    radius = 65.0
-    atmosphere_height = 0.0
-    rotation_period = 544507.43
-        [moon.orbit]
-        semi_major_axis = 1.285e5
-        eccentricity = 0.235
-        inclination = 15.0
-        longitude_of_the_an = 10.0
-        arg_of_periapsis = 25.0
-        mean_anomaly_at_t0 = 0.9
-
-    [[planet.moon]]
-    name = "Pol"
-    std_grav_param = 7.2170208e-1
-    radius = 44.0
-    atmosphere_height = 0.0
-    rotation_period = 901902.62
-        [moon.orbit]
-        semi_major_axis = 1.7989e5
-        eccentricity = 0.171
-        inclination = 4.25
-        longitude_of_the_an = 2.0
-        arg_of_periapsis = 15.0
-        mean_anomaly_at_t0 = 0.9
+  [[planet.moon]]
+  name = "Pol"
+  std_grav_param = 7.2170208e-1
+  radius = 44.0
+  atmosphere_height = 0.0
+  rotation_period = 901902.62
+    [planet.moon.orbit]
+    semi_major_axis = 1.7989e5
+    eccentricity = 0.171
+    inclination = 4.25
+    longitude_of_the_an = 2.0
+    arg_of_periapsis = 15.0
+    mean_anomaly_at_t0 = 0.9
 
 [[planet]]
 name = "Eeloo"
@@ -221,10 +221,10 @@ std_grav_param = 7.4410815e1
 radius = 210.0
 atmosphere_height = 0.0
 rotation_period = 19460.0
-    [planet.orbit]
-    semi_major_axis = 9.0118820000e7
-    eccentricity = 0.26
-    inclination = 6.15
-    longitude_of_the_an = 50.0
-    arg_of_periapsis = 260.0
-    mean_anomaly_at_t0 = 3.14
+  [planet.orbit]
+  semi_major_axis = 9.0118820000e7
+  eccentricity = 0.26
+  inclination = 6.15
+  longitude_of_the_an = 50.0
+  arg_of_periapsis = 260.0
+  mean_anomaly_at_t0 = 3.14
