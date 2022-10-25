@@ -15,7 +15,7 @@ pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f32>> {
 		points.push(point);
 		nu += d_nu;
 	}
-	return points;
+	points
 }
 
 pub fn draw_orbit_points(
@@ -24,9 +24,9 @@ pub fn draw_orbit_points(
 	color: &Point3<f32>,
 ) {
 	for i in 0..points.len() - 1 {
-		window.draw_line(&(points[i]), &(points[i + 1]), &color);
+		window.draw_line(&(points[i]), &(points[i + 1]), color);
 	}
-	window.draw_line(&(points[0]), &(points[points.len() - 1]), &color);
+	window.draw_line(&(points[0]), &(points[points.len() - 1]), color);
 }
 
 pub fn draw_full_axes(w: &mut kiss3d::window::Window, box_size: f32, margin: f32) {
