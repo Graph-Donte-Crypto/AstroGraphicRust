@@ -3,46 +3,46 @@
 use core::f32::consts::TAU;
 use nalgebra::{Matrix3x2, Vector2, Vector3};
 
-#[derive(Builder, Getters, Setters, Debug)]
+#[derive(Builder, CopyGetters, Debug)]
 #[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit {
 	/// Standard gravitational parameter
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(setter(name = "std_grav_param"))]
 	mu: f32,
 
 	/// Semi-major axis
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(setter(name = "semi_major_axis"))]
 	a: f32,
 
 	/// Eccentricity
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(default, setter(name = "eccentricity"))]
 	e: f32,
 
 	/// Inclination
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(default, setter(name = "inclination"))]
 	i: f32,
 
 	/// Longitude of the ascending node
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(default, setter(name = "long_of_asc_node"))]
 	Omega: f32,
 
 	/// Argument of periapsis
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(default, setter(name = "arg_of_periapsis"))]
 	omega: f32,
 
 	/// Mean anomaly at T=0
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(default, setter(name = "mean_anomaly_at_t0"))]
 	M0: f32,
 
 	/// Orbital period
-	#[getset(get = "pub")]
+	#[getset(get_copy = "pub")]
 	#[builder(setter(skip))]
 	period: f32, // orbital period
 
