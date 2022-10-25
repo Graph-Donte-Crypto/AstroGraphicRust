@@ -1,12 +1,12 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_lib as lib;
-use gui_lib::kiss3d::{event::MouseButton, light::Light, nalgebra as na, window::Window};
+use gui_lib::kiss3d::{light::Light, nalgebra as na, window::Window};
 use na::{Point3, UnitQuaternion, Translation3, Vector3};
 use core::f32::consts::PI;
 
 #[allow(non_snake_case)]
 fn main() {
-    const SPHERE_RADIUS: f32 = 1.0;
+	const SPHERE_RADIUS: f32 = 1.0;
 
 	let mut window = Window::new("Astro Graphic Rust");
 
@@ -27,7 +27,7 @@ fn main() {
 		.long_of_asc_node(15_f32.to_radians())
 		.arg_of_periapsis(70_f32.to_radians())
 		.build()
-        .unwrap();
+		.unwrap();
 	dbg!(&orbit);
 
 	let points = gui_lib::generate_orbit_points(&orbit, 500);
