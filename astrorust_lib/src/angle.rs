@@ -1,6 +1,8 @@
 use std::f64::consts::{PI, TAU};
 use std::ops::{Add, Deref, Sub};
 
+use nalgebra::ComplexField;
+
 use crate::kepler_equation;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -33,6 +35,10 @@ impl Angle {
     pub fn sin_cos(&self) -> (f64, f64) {
         self.0.sin_cos()
     }
+
+    pub fn sin(&self) -> f64 {
+        self.0.sin()
+    }
 }
 
 impl Add for Angle {
@@ -62,6 +68,29 @@ impl From<Angle> for EccAnomaly {
 
 impl Deref for EccAnomaly {
     type Target = Angle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HypAnomaly(f64);
+
+impl HypAnomaly {
+    pub fn sinh_cosh(&self) -> (f64, f64) {
+        self.0.sinh_cosh()
+    }
+}
+
+impl From<f64> for HypAnomaly {
+    fn from(value: f64) -> Self {
+        Self(value)
+    }
+}
+
+impl Deref for HypAnomaly {
+    type Target = f64;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -115,5 +144,11 @@ impl<T> IntoAnomaly<T> for T {
 impl IntoAnomaly<EccAnomaly> for MeanAnomaly {
     fn into_anomaly(self, e: f64) -> EccAnomaly {
         kepler_equation::solve_kepler_householder_pade_elliptic(e, self)
+    }
+}
+
+impl IntoAnomaly<HypAnomaly> for MeanAnomaly {
+    fn into_anomaly(self, e: f64) -> HypAnomaly {
+        crate::orbit::flat::hyperbolic::HyperbolaSolver::new(e).solve(self.as_rad()).into()
     }
 }
