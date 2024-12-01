@@ -1,9 +1,8 @@
 use std::f64::consts::{PI, TAU};
 use std::ops::{Add, Deref, Sub};
 
-use nalgebra::ComplexField;
-
 use crate::kepler_equation;
+use crate::util::FloatExt;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Angle(f64);

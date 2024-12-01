@@ -40,34 +40,34 @@ impl StateVectorTypes for HyperbolicOrbit {
 
 impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
     fn position(&self, M: MeanAnomaly) -> Self::Position {
-        let E: HypAnomaly = M.into_anomaly(self.0.e);
-        self.r_from_sinh_cosh_H(E.sin_cos())
+        let H: HypAnomaly = M.into_anomaly(self.0.e);
+        self.r_from_sinh_cosh_H(H.sinh_cosh())
     }
 
     fn velocity(&self, M: MeanAnomaly) -> Self::Velocity {
-        let E: HypAnomaly = M.into_anomaly(self.0.e);
-        self.v_from_sinh_cosh_H(E.sin_cos())
+        let H: HypAnomaly = M.into_anomaly(self.0.e);
+        self.v_from_sinh_cosh_H(H.sinh_cosh())
     }
 
     fn position_and_velocity(&self, M: MeanAnomaly) -> (Self::Position, Self::Velocity) {
-        let E: HypAnomaly = M.into_anomaly(self.0.e);
-        let sin_cos_E = E.sin_cos();
-        (self.r_from_sinh_cosh_H(sin_cos_E), self.v_from_sinh_cosh_H(sin_cos_E))
+        let H: HypAnomaly = M.into_anomaly(self.0.e);
+        let sinh_cosh_H = H.sinh_cosh();
+        (self.r_from_sinh_cosh_H(sinh_cosh_H), self.v_from_sinh_cosh_H(sinh_cosh_H))
     }
 }
 
 impl StateVectors<HypAnomaly> for HyperbolicOrbit {
     fn position(&self, H: HypAnomaly) -> Self::Position {
-        self.r_from_sinh_cosh_H(H.sin_cos())
+        self.r_from_sinh_cosh_H(H.sinh_cosh())
     }
 
     fn velocity(&self, H: HypAnomaly) -> Self::Velocity {
-        self.v_from_sinh_cosh_H(H.sin_cos())
+        self.v_from_sinh_cosh_H(H.sinh_cosh())
     }
 
     fn position_and_velocity(&self, H: HypAnomaly) -> (Self::Position, Self::Velocity) {
-        let sin_cos_E = H.sin_cos();
-        (self.r_from_sinh_cosh_H(sin_cos_E), self.v_from_sinh_cosh_H(sin_cos_E))
+        let sinh_cosh_H = H.sinh_cosh();
+        (self.r_from_sinh_cosh_H(sinh_cosh_H), self.v_from_sinh_cosh_H(sinh_cosh_H))
     }
 }
 
@@ -81,8 +81,8 @@ impl StateVectors<TrueAnomaly> for HyperbolicOrbit {
     }
 
     fn position_and_velocity(&self, nu: TrueAnomaly) -> (Self::Position, Self::Velocity) {
-        let sin_cos_E = self.sinh_cosh_H_from_nu(nu, self.0.e);
-        (self.r_from_sinh_cosh_H(sin_cos_E), self.v_from_sinh_cosh_H(sin_cos_E))
+        let sinh_cosh_H = self.sinh_cosh_H_from_nu(nu, self.0.e);
+        (self.r_from_sinh_cosh_H(sinh_cosh_H), self.v_from_sinh_cosh_H(sinh_cosh_H))
     }
 }
 

@@ -1,7 +1,7 @@
 pub mod circular;
 pub mod elliptic;
-pub mod parabolic;
 pub mod hyperbolic;
+pub mod parabolic;
 
 use nalgebra::Vector2;
 
