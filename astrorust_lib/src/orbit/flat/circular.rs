@@ -45,3 +45,13 @@ impl StateVectors<Time> for CircularOrbit {
         self.position_and_velocity(TrueAnomaly::from(*self.0.M_from_t(t)))
     }
 }
+
+impl CircularOrbit {
+    pub fn speed(&self) -> f64 {
+        self.0.speed_root
+    }
+
+    pub fn distance(&self) -> f64 {
+        self.0.a
+    }
+}
