@@ -40,7 +40,7 @@ pub struct Orbit2D {
     #[builder(setter(skip), default = "((1.0 - self.e.unwrap_or(0.0).powi(2)).abs()).sqrt()")]
     e_root: f64,
 
-    #[builder(setter(skip), default = "(self.mu.unwrap() * self.a.unwrap().abs().powi(3)).sqrt()")]
+    #[builder(setter(skip), default = "(self.mu.unwrap() / self.a.unwrap().abs().powi(3)).sqrt()")]
     mean_motion: f64, // sqrt(mu / a^3)
 }
 

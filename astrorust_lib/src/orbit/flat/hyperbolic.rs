@@ -51,6 +51,7 @@ impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
 
     fn position_and_velocity(&self, M: MeanAnomaly) -> (Self::Position, Self::Velocity) {
         let H: HypAnomaly = M.into_anomaly(self.0.e);
+        dbg!(M, H);
         let sinh_cosh_H = H.sinh_cosh();
         (self.r_from_sinh_cosh_H(sinh_cosh_H), self.v_from_sinh_cosh_H(sinh_cosh_H))
     }
@@ -307,6 +308,12 @@ fn bisection(function: &impl Fn(f64) -> f64, min: f64, max: f64) -> f64 {
 
 #[cfg(test)]
 mod test {
+    use crate::angle::Angle;
+    use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
+    use crate::orbit::flat::Orbit2DBuilder;
+    use crate::state_vectors::StateVectors;
+    use crate::time::Time;
+
     use super::{bisection, HyperbolaSolver};
     use std::f64::consts::PI;
 
@@ -354,27 +361,41 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn atlas_comet() {
+        let periapsis = 1.495978707e8 * 0.3914; // au
+        let e = 1.000093;
+        let orbit = Orbit2DBuilder::default()
+            .std_grav_param(1.32712440018e11)
+            .semi_major_axis(periapsis / (1. - e))
+            .eccentricity(e)
+            .build()
+            .unwrap();
+        let orbit = HyperbolicOrbit(orbit);
+        dbg!(&orbit);
+        let (r, v) = orbit.position_and_velocity(Time::from_secs(5702400.));
+        dbg!(r.norm() / 1.495978707e8, v.norm());
+        assert!((r.norm() / 1.495978707e8 - 1.505).abs() < 1e-2);
+        assert!((v.norm() - 34.338).abs() < 0.05);
+    }
+
+    #[test]
+    fn oumuamua() {
+        let periapsis = 1.495978707e8 * 0.255916; // au
+        let e = 1.20113;
+        let orbit = Orbit2DBuilder::default()
+            .std_grav_param(1.32712440018e11)
+            .semi_major_axis(periapsis / (1. - e))
+            .mean_anomaly_at_t0(Angle::from_deg(51.158).into())
+            .eccentricity(e)
+            .build()
+            .unwrap();
+        let orbit = HyperbolicOrbit(orbit);
+        dbg!(&orbit);
+        let (r, v) = orbit.position_and_velocity(Time::from_secs(2.2178214e8));
+        dbg!(r.norm(), v.norm());
+        assert!((r.norm() - 6_617_428_725.33).abs() < 1e-2);
+        assert!((v.norm() - 27.15).abs() < 0.05);
+    }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use crate::angle::{Angle, TrueAnomaly};
-//     use crate::orbit::flat::elliptic::HyperbolicOrbit;
-//     use crate::orbit::flat::Orbit2DBuilder;
-//     use crate::state_vectors::StateVectors;
-
-//     // #[test]
-//     // fn kerbin() {
-//     //     let orbit = Orbit2DBuilder::default()
-//     //         .std_grav_param(1.1723328e9)
-//     //         .semi_major_axis(1.3599840256e7)
-//     //         .mean_anomaly_at_t0(Angle::from_rad(3.14).into())
-//     //         .build()
-//     //         .unwrap();
-//     //     let orbit = HyperbolicOrbit(orbit);
-//     //     dbg!(&orbit);
-//     //     let (r, v) = orbit.position_and_velocity(TrueAnomaly::from(Angle::from_rad(0.0)));
-//     //     assert!((r.norm() - 1.3599840256e7).abs() < 1e-8);
-//     //     assert!((v.norm() - 9.285).abs() < 1e-3);
-//     // }
-// }
