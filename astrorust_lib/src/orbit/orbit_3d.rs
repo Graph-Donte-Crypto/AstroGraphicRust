@@ -7,7 +7,7 @@ use nalgebra::Matrix3x2;
 // #[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit3D<O> {
     #[builder(setter)]
-    orbit_2d: O,
+    pub orbit_2d: O,
 
     /// Inclination
     #[getset(get_copy = "pub")]
@@ -30,6 +30,12 @@ pub struct Orbit3D<O> {
         default = "Orbit3D::<O>::compute_orb_to_ecl(self.i.unwrap(), self.Omega.unwrap(), self.omega.unwrap())"
     )]
     orb_to_ecl: Matrix3x2<f64>,
+}
+
+impl<O> Orbit3D<O> {
+    pub fn orb_to_ecl(&self) -> &Matrix3x2<f64> {
+        &self.orb_to_ecl
+    }
 }
 
 impl<O: StateVectorTypes> StateVectorTypes for Orbit3D<O>

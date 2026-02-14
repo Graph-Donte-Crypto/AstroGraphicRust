@@ -5,9 +5,16 @@ use crate::state_vectors::{StateVectorTypes, StateVectors};
 use crate::time::Time;
 
 use super::Orbit2D;
+use std::f64::consts::TAU;
 
-#[derive(Debug)]
-pub struct EllipticOrbit(Orbit2D);
+#[derive(Debug, Clone)]
+pub struct EllipticOrbit(pub Orbit2D);
+
+impl From<Orbit2D> for EllipticOrbit {
+    fn from(orbit: Orbit2D) -> Self {
+        Self(orbit)
+    }
+}
 
 impl EllipticOrbit {
     fn r_from_sin_cos_E(&self, (sin_E, cos_E): (f64, f64)) -> Vector2<f64> {
@@ -28,6 +35,10 @@ impl EllipticOrbit {
         let sin_E = self.0.e_root * sin_nu * inv_denominator;
         let cos_E = (e + cos_nu) * inv_denominator;
         (sin_E, cos_E)
+    }
+
+    pub fn period(&self) -> Time {
+        Time::from_secs(TAU / self.0.mean_motion)
     }
 }
 
