@@ -2,8 +2,5 @@
 
 [![Rust CI](https://github.com/Graph-Donte-Crypto/AstroGraphicRust/workflows/Rust/badge.svg)](actions?query=workflow%3ARust)
 
-A Project for visualization of interplanetary trajectories with gravity assists
+https://github.com/user-attachments/assets/edfc578d-3c03-4f97-81e6-5574b395de75
 
-Проект по визуализации межпланетных траекторий с гравитационными манёврами
-
-![Planet orbiting the star](images/AstroGraphicRust_Example1.png?raw=true)
