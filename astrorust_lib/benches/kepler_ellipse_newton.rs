@@ -5,7 +5,7 @@ use astrorust_lib::kepler_equation;
 use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 
 pub fn bench(c: &mut Criterion) {
-    let eccentricities = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99];
+    let eccentricities = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.9999999];
     let mean_anomalies = [0.01, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 5.5, 6.0, 6.283];
 
     let mut group = c.benchmark_group("ellipse");
@@ -19,10 +19,7 @@ pub fn bench(c: &mut Criterion) {
             b.iter(|| {
                 for m in mean_anomalies {
                     let m = Angle::from_rad(m).into();
-                    kepler_equation::solve_kepler_householder_pade_elliptic(
-                        e,
-                        criterion::black_box(m),
-                    );
+                    kepler_equation::solve_kepler_newton_pade(e, criterion::black_box(m));
                 }
             });
         });

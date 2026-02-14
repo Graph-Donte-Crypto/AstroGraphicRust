@@ -25,21 +25,22 @@ pub fn solve_kepler_householder_pade_elliptic(e: f64, M: MeanAnomaly) -> EccAnom
     Angle::from_rad(E).into()
 }
 
-// fn solve_kepler_newton_pade(e: f64, M: f64) -> f64 {
-//     let M = normalize_radians(M);
-//     let mut E0 = pade_initial_guess(e, M);
+pub fn solve_kepler_newton_pade(e: f64, M: MeanAnomaly) -> EccAnomaly {
+    let M = M.normalize().into();
+    let mut E0 = pade_initial_guess(e, M).as_rad();
+    let M = M.as_rad();
 
-//     let mut E = E0;
-//     for _ in 0..15 {
-//         let (sin_E0, cos_E0) = E.sin_cos();
-//         E = E0 - (E0 - e * sin_E0 - M) / (1.0 - e * cos_E0);
-//         if (E - E0).abs() < f64::EPSILON {
-//             break;
-//         }
-//         E0 = E;
-//     }
-//     E
-// }
+    let mut E = E0;
+    for _ in 0..15 {
+        let (sin_E0, cos_E0) = E.sin_cos();
+        E = E0 - (E0 - e * sin_E0 - M) / (1.0 - e * cos_E0);
+        if (E - E0).abs() < f64::EPSILON {
+            break;
+        }
+        E0 = E;
+    }
+    Angle::from_rad(E).into()
+}
 
 // fn solve_kepler_newton_simple(e: f64, M: f64) -> f64 {
 //     let M = normalize_radians(M);

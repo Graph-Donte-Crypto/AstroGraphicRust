@@ -48,7 +48,7 @@ impl Orbit2DBuilder {
     pub fn validate(&self) -> Result<(), String> {
         let a = self.a.unwrap();
         match self.e {
-            Some(e) if e <= 0.0 => return Err("Eccentricity must be non-negative".into()),
+            Some(e) if e < 0.0 => return Err("Eccentricity must be non-negative".into()),
             Some(e) if e > 1.0 && a > 0.0 => {
                 return Err("Semi-major axis must be < 0 if eccentricity is > 1 (hyperbolic)".into())
             }

@@ -27,7 +27,7 @@ pub struct Orbit3D<O> {
     /// Matrix to transform vectors from orbital to ecliptic coordinates
     #[builder(
         setter(skip),
-        default = "Orbit3D::<O>::compute_orb_to_ecl(self.i.unwrap(), self.Omega.unwrap(), self.omega.unwrap())"
+        default = "Orbit3D::<O>::compute_orb_to_ecl(self.i.unwrap_or_default(), self.Omega.unwrap_or_default(), self.omega.unwrap_or_default())"
     )]
     orb_to_ecl: Matrix3x2<f64>,
 }

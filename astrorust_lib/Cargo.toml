@@ -21,10 +21,13 @@ similar-asserts = "1.6.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
-name = "solve_kepler_ellipse"
+name = "solve_kepler_ellipse_householder"
+harness = false
+
+[[bench]]
+name = "kepler_ellipse_newton"
 harness = false
 
 [[bench]]
 name = "solve_kepler_hyperbola"
 harness = false
-
