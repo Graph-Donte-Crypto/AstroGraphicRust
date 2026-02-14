@@ -27,8 +27,8 @@ fn main() {
     let mut planet2 = window.add_sphere(2.0);
     let mut planet3 = window.add_sphere(1.0);
     planet1.set_color(0.38, 0.52, 0.76);
-    planet2.set_color(0.38, 0.52, 0.76);
-    planet3.set_color(1.0, 0.0, 0.0);
+    planet2.set_color(1.0, 0.0, 0.0);
+    planet3.set_color(0.8, 1.0, 0.8);
     star.set_color(1.0, 1.0, 0.0);
     window.set_light(Light::Absolute(Point3::origin()));
 
