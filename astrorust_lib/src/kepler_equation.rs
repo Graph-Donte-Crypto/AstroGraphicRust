@@ -5,6 +5,7 @@ use crate::angle::{Angle, EccAnomaly, MeanAnomaly};
 /// Elliptic Kepler's equation solver (about 40% faster than naive implementation
 /// with Newton's method) Based on the paper by F. Landis Markley "Kepler
 /// equation solver" (1995)
+#[inline]
 pub fn solve_kepler_householder_pade_elliptic(e: f64, M: MeanAnomaly) -> EccAnomaly {
     let M = M.normalize();
     let E = pade_initial_guess(e, M.into()).as_rad();
@@ -25,6 +26,7 @@ pub fn solve_kepler_householder_pade_elliptic(e: f64, M: MeanAnomaly) -> EccAnom
     Angle::from_rad(E).into()
 }
 
+#[inline]
 pub fn solve_kepler_newton_pade(e: f64, M: MeanAnomaly) -> EccAnomaly {
     let M = M.normalize().into();
     let mut E0 = pade_initial_guess(e, M).as_rad();
@@ -42,22 +44,24 @@ pub fn solve_kepler_newton_pade(e: f64, M: MeanAnomaly) -> EccAnomaly {
     Angle::from_rad(E).into()
 }
 
-// fn solve_kepler_newton_simple(e: f64, M: f64) -> f64 {
-//     let M = normalize_radians(M);
-//     let mut E0 = if M < 0.0 { M - e } else { M + e };
+#[inline]
+pub fn solve_kepler_newton_simple(e: f64, M: MeanAnomaly) -> EccAnomaly {
+    let M = Angle::from(M.normalize()).as_rad();
+    let mut E0 = if M < 0.0 { M - e } else { M + e };
 
-//     let mut E = E0;
-//     for _ in 0..15 {
-//         let (sin_E0, cos_E0) = E.sin_cos();
-//         E = E0 - (E0 - e * sin_E0 - M) / (1.0 - e * cos_E0);
-//         if (E - E0).abs() < f64::EPSILON {
-//             break;
-//         }
-//         E0 = E;
-//     }
-//     E
-// }
+    let mut E = E0;
+    for _ in 0..15 {
+        let (sin_E0, cos_E0) = E.sin_cos();
+        E = E0 - (E0 - e * sin_E0 - M) / (1.0 - e * cos_E0);
+        if (E - E0).abs() < f64::EPSILON {
+            break;
+        }
+        E0 = E;
+    }
+    Angle::from_rad(E).into()
+}
 
+#[inline]
 fn pade_initial_guess(e: f64, M: MeanAnomaly) -> EccAnomaly {
     const ALPHA_MULT: f64 = 1.0 / (PI * PI - 6.0);
 
