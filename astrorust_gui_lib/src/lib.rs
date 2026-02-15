@@ -12,13 +12,12 @@ type Orbit = Orbit3D<EllipticOrbit>;
 
 /// E -- eccentric anomaly
 #[allow(non_snake_case)]
-pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f32>> {
+pub fn generate_orbit_points(orbit: &Orbit, count: usize) -> Vec<Point3<f64>> {
     let mut E: f64 = 0.0;
     let mut points = Vec::with_capacity(count);
     let dE = TAU / (count as f64);
     for _ in 0..count {
-        let r = orbit.position(EccAnomaly::from(Angle::from_rad(E)));
-        points.push(Point3::new(r.x as f32, r.y as f32, r.z as f32));
+        points.push(orbit.position(EccAnomaly::from(Angle::from_rad(E))).into());
         E += dE;
     }
     points

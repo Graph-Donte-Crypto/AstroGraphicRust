@@ -18,3 +18,9 @@ impl From<Duration> for Time {
         Self::from_secs(duration.as_secs_f64())
     }
 }
+
+impl From<Time> for Duration {
+    fn from(time: Time) -> Duration {
+        Duration::from_secs_f64(time.as_secs())
+    }
+}

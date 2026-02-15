@@ -1,9 +1,16 @@
 [package]
 name = "astrorust_app"
 version = "0.1.0"
-authors = ["Graph-Donte-Crypto <Dimasik841@gmail.com>", "Artur Sinila <freesoftware@logarithmus.dev>"]
+authors = [
+  "Graph-Donte-Crypto <Dimasik841@gmail.com>",
+  "Artur Sinila <freesoftware@logarithmus.dev>",
+]
 edition = "2018"
 
 [dependencies]
 astrorust_lib = { path = "../astrorust_lib" }
 astrorust_gui_lib = { path = "../astrorust_gui_lib" }
+chrono = { version = "0.4.43", default-features = false, features = [
+  "now",
+  "defmt",
+] }

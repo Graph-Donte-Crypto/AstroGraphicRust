@@ -1,0 +1,204 @@
+# All units in km seconds and degrees. M_0 in rad
+star:
+  name: Kerbol
+  μ: 1172332800
+  radius: 2616000
+  atmosphere_height: 600
+  siderial_day: 432000
+planets:
+  - name: Moho
+    μ: 168.60938
+    radius: 250
+    atmosphere_height: 0
+    siderial_day: 121000
+    orbit:
+      a: 5263138.304
+      e: 0.2
+      i: 7
+      Ω: 70
+      ω: 15
+      M0: 3.14
+  - name: Eve
+    μ: 8171.7302
+    radius: 700
+    atmosphere_height: 90
+    siderial_day: 80500
+    orbit:
+      a: 9832684.544
+      e: 0.01
+      i: 2.1
+      Ω: 15
+      ω: 0
+      M0: 3.14
+    moons:
+      - name: Gilly
+        μ: 82894.498
+        radius: 13
+        atmosphere_height: 0
+        siderial_day: 28255
+        orbit:
+          a: 31500
+          e: 0.55
+          i: 12
+          Ω: 80
+          ω: 10
+          M0: 0.9
+  - name: Kerbin
+    μ: 3531.6
+    radius: 600
+    atmosphere_height: 70
+    siderial_day: 21549.425
+    orbit:
+      a: 13599840.256
+      e: 0
+      i: 0
+      Ω: 0
+      ω: 0
+      M0: 3.14
+    moons:
+      - name: Mun
+        μ: 65.138398
+        radius: 200
+        atmosphere_height: 0
+        siderial_day: 138984.38
+        orbit:
+          a: 12000
+          e: 0
+          i: 0
+          Ω: 0
+          ω: 0
+          M0: 1.7
+      - name: Minmus
+        μ: 1.7658
+        radius: 60
+        atmosphere_height: 0
+        siderial_day: 40400
+        orbit:
+          a: 47000
+          e: 0
+          i: 6
+          Ω: 78
+          ω: 38
+          M0: 0.9
+  - name: Duna
+    μ: 301.36321
+    radius: 320
+    atmosphere_height: 50
+    siderial_day: 65517.859
+    orbit:
+      a: 20726155.264
+      e: 0.051
+      i: 0.06
+      Ω: 135.5
+      ω: 0
+      M0: 3.14
+    moons:
+      - name: Ike
+        μ: 18.568369
+        radius: 130
+        atmosphere_height: 0
+        siderial_day: 65517.862
+        orbit:
+          a: 3200
+          e: 0.03
+          i: 0.2
+          Ω: 0
+          ω: 0
+          M0: 1.7
+  - name: Dres
+    μ: 21.484489
+    radius: 138
+    atmosphere_height: 0
+    siderial_day: 34800
+    orbit:
+      a: 40839348.203
+      e: 0.145
+      i: 5
+      Ω: 280
+      ω: 90
+      M0: 3.14
+  - name: Jool
+    μ: 282528
+    radius: 6000
+    atmosphere_height: 200
+    siderial_day: 36000
+    orbit:
+      a: 68773560.32
+      e: 0.05
+      i: 1.304
+      Ω: 52
+      ω: 0
+      M0: 0.1
+    moons:
+      - name: Laythe
+        μ: 1962
+        radius: 500
+        atmosphere_height: 50
+        siderial_day: 52980.879
+        orbit:
+          a: 2718.4
+          e: 0
+          i: 0
+          Ω: 0
+          ω: 0
+          M0: 3.14
+      - name: Vall
+        μ: 207.4815
+        radius: 300
+        atmosphere_height: 0
+        siderial_day: 105962.09
+        orbit:
+          a: 4315.2
+          e: 0
+          i: 0
+          Ω: 0
+          ω: 0
+          M0: 0.9
+      - name: Tylo
+        μ: 2825.28
+        radius: 600
+        atmosphere_height: 0
+        siderial_day: 211926.36
+        orbit:
+          a: 68500
+          e: 0
+          i: 0.025
+          Ω: 0
+          ω: 0
+          M0: 3.14
+      - name: Bop
+        μ: 2.4868349
+        radius: 65
+        atmosphere_height: 0
+        siderial_day: 544507.43
+        orbit:
+          a: 128500
+          e: 0.235
+          i: 15
+          Ω: 10
+          ω: 25
+          M0: 0.9
+      - name: Pol
+        μ: 0.72170208
+        radius: 44
+        atmosphere_height: 0
+        siderial_day: 901902.62
+        orbit:
+          a: 179890
+          e: 0.171
+          i: 4.25
+          Ω: 2
+          ω: 15
+          M0: 0.9
+  - name: Eeloo
+    μ: 74.410815
+    radius: 210
+    atmosphere_height: 0
+    siderial_day: 19460
+    orbit:
+      a: 90118820
+      e: 0.26
+      i: 6.15
+      Ω: 50
+      ω: 260
+      M0: 3.14

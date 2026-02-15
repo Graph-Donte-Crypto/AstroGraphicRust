@@ -1,7 +1,6 @@
-use std::ops::Mul;
-
 use crate::state_vectors::{StateVectorTypes, StateVectors};
 use nalgebra::Matrix3x2;
+use std::ops::Mul;
 
 #[derive(Builder, CopyGetters, Debug)]
 // #[builder(build_fn(validate = "Self::validate"))]
