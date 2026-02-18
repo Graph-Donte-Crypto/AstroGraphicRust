@@ -1,0 +1,10 @@
+system: solar
+spacecraft:
+  body: Sun
+  orbit:
+    a: 128903011.5
+    e: 0.1605471529
+    i: 0.0
+    Ω: 0.0
+    ω: 0.0
+    M0: 0.0

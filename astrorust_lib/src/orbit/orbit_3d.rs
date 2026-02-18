@@ -37,6 +37,7 @@ impl<O> Orbit3D<O> {
     }
 }
 
+
 impl<O: StateVectorTypes> StateVectorTypes for Orbit3D<O>
 where
     Matrix3x2<f64>: Mul<<O as StateVectorTypes>::Position>,

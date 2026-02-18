@@ -4,9 +4,10 @@ use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::Point2;
 use astrorust_lib::angle::{Angle, EccAnomaly};
-use astrorust_lib::config::StarSystem;
+use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
-use astrorust_lib::orbit::orbit_3d::Orbit3D;
+use astrorust_lib::orbit::flat::Orbit2DBuilder;
+use astrorust_lib::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
 use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use chrono::NaiveDate;
@@ -43,17 +44,42 @@ fn main() {
     star.set_color(1.0, 1.0, 0.0);
     window.set_light(Light::Absolute(Point3::origin()));
 
-    let config = StarSystem::load_from_yaml("config/star_system/solar.yml").unwrap();
+    let config = Config::load_from_yaml("config/config.yml").unwrap();
+    let system = config.system.to_lowercase();
+    let system = StarSystem::load_from_yaml(&format!("config/system/{system}.yml")).unwrap();
 
-    let scale = 100.0 / config.planets.first().unwrap().orbit.a;
+    let scale = 100.0 / system.planets.first().unwrap().orbit.a;
 
-    let mut planets: Vec<Planet> = config
+    let mut planets: Vec<Body> = system
         .clone()
         .into_planets()
         .into_iter()
         .zip(PLANET_COLORS)
-        .map(|(orbit, color)| create_planet(&mut window, scale, orbit, color.clone()))
+        .map(|((body, orbit), color)| {
+            create_body(&mut window, scale, orbit, color.clone(), Some(body))
+        })
         .collect();
+    let (_, spacecraft_μ) = std::iter::once((system.star.name.as_str(), system.star.μ))
+        .chain(system.planets.iter().map(|planet| (planet.body.name.as_str(), planet.body.μ)))
+        .find(|(name, _)| *name == config.spacecraft.body)
+        .expect(&format!("Body `{}` not found", config.spacecraft.body));
+    let spacecraft: EllipticOrbit = Orbit2DBuilder::default()
+        .std_grav_param(spacecraft_μ)
+        .semi_major_axis(config.spacecraft.orbit.a)
+        .eccentricity(config.spacecraft.orbit.e)
+        .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
+        .build()
+        .unwrap()
+        .into();
+    let spacecraft = Orbit3DBuilder::default()
+        .orbit_2d(spacecraft)
+        .inclination(config.spacecraft.orbit.i.to_radians())
+        .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
+        .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
+        .build()
+        .unwrap();
+    let mut spacecraft =
+        create_body(&mut window, scale, spacecraft, Point3::new(1.0, 1.0, 1.0), None);
 
     window.set_line_width(3.0);
     window.set_framerate_limit(Some(60));
@@ -75,6 +101,29 @@ fn main() {
         for planet in &mut planets {
             draw_orbit_and_current_position(&mut window, &eye, scale, planet, t);
         }
+        let r = spacecraft.orbit.position(t);
+        if let Some(planet) = planets.iter().find(|planet| {
+            let Some(body) = &planet.body else {
+                return false;
+            };
+            (planet.orbit.position(t) - r).magnitude_squared()
+                < planet.orbit.orbit_2d.0.a() * (body.μ / planet.orbit.orbit_2d.0.mu()).powf(0.4)
+        }) {
+            // Compute gravity assist
+
+            eprintln!("Spacecraft encounter with planet {}", planet.body.as_ref().unwrap().name);
+            let (planet_r, planet_v) = planet.orbit.position_and_velocity(t);
+            let r = r - planet_r;
+            let v = spacecraft.orbit.velocity(t) - planet_v;
+
+            // rotate v by angle delta and r by (pi - delta)
+
+            let r = r + planet_r;
+            let v = v + planet_v;
+
+            // calculate new orbit from new r and v
+        }
+        draw_orbit_and_current_position(&mut window, &eye, scale, &mut spacecraft, t);
 
         window.draw_text(
             &format!("Time: {}", (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M")),
@@ -83,10 +132,10 @@ fn main() {
             &Font::default(),
             &Point3::new(1.0, 1.0, 1.0),
         );
-        camera.frame.set_eye(
-            &(&eye + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32 * eye.coords.normalize()),
-            &Vector3::new(0.0, 0.0, 1.0),
-        );
+        // camera.frame.set_eye(
+        //     &(&eye + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32 * eye.coords.normalize()),
+        //     &Vector3::new(0.0, 0.0, 1.0),
+        // );
     }
 }
 
@@ -94,19 +143,18 @@ fn draw_orbit_and_current_position(
     window: &mut Window,
     eye: &Point3<f32>,
     scale: f64,
-    planet: &mut Planet,
+    body: &mut Body,
     t: Time,
 ) {
-    gui_lib::draw_orbit_points(window, &planet.points, &planet.color);
-
-    let (r, v) = planet.orbit.position_and_velocity(t);
+    gui_lib::draw_orbit_points(window, &body.points, &body.color);
+    let r = body.orbit.position(t);
     // window.draw_line(&planet.pe, &planet.ap, &Point3::new(0.7, 1.0, 0.7));
     // window.draw_line(&Point3::origin(), &r.map(|x| x as f32).into(), &Point3::new(0.6, 0.6, 1.0));
 
-    planet.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
-    let clamp = (20.0, (50.0 * planet.orbit.orbit_2d.0.a().max(149.6 * 1e6) / 90118820.0) as f32);
+    body.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
+    let clamp = (20.0, (50.0 * body.orbit.orbit_2d.0.a().max(149.6 * 1e6) / 90118820.0) as f32);
     let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
-    planet.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
+    body.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 
     // if draw_text {
     //     window.draw_text(
@@ -119,12 +167,13 @@ fn draw_orbit_and_current_position(
     // }
 }
 
-fn create_planet(
+fn create_body(
     window: &mut Window,
     scale: f64,
     orbit: Orbit3D<EllipticOrbit>,
     color: Point3<f32>,
-) -> Planet {
+    body: Option<CelestialBody>,
+) -> Body {
     let points = gui_lib::generate_orbit_points(&orbit, 100)
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
@@ -137,11 +186,12 @@ fn create_planet(
     let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
     sphere.set_color(color.x, color.y, color.z);
 
-    Planet { sphere, orbit, points, pe, ap, color }
+    Body { sphere, body, orbit, points, pe, ap, color }
 }
 
-struct Planet {
+struct Body {
     sphere: SceneNode,
+    body: Option<CelestialBody>,
     orbit: Orbit3D<EllipticOrbit>,
     points: Vec<Point3<f32>>,
     pe: Point3<f32>,

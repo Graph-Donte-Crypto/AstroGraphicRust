@@ -6,7 +6,6 @@ extern crate getset;
 extern crate derive_builder;
 
 pub mod angle;
-pub mod body;
 pub mod config;
 pub mod gravity_assist;
 pub mod kepler_equation;

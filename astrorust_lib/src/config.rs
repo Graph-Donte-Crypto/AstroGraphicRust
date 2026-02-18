@@ -5,6 +5,18 @@ use crate::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Config {
+    pub system: String,
+    pub spacecraft: Spacecraft,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Spacecraft {
+    pub body: String,
+    pub orbit: Orbit,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct StarSystem {
     pub star: CelestialBody,
     pub planets: Vec<Planet>,
@@ -27,8 +39,17 @@ pub struct Planet {
     pub orbit: Orbit,
 }
 
+impl Planet {
+    pub fn soi_radius(&self) -> f64 {
+        self.orbit.a * (self.body.μ / self.orbit.mu).powf(0.4)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Orbit {
+    #[serde(default)]
+    pub mu: f64,
+
     /// Semi-major axis
     pub a: f64,
     /// Eccentricity
@@ -45,14 +66,18 @@ pub struct Orbit {
 
 impl StarSystem {
     pub fn load_from_yaml(path: &str) -> anyhow::Result<Self> {
-        Ok(serde_saphyr::from_str(&std::fs::read_to_string(path)?)?)
+        let mut system: Self = serde_saphyr::from_str(&std::fs::read_to_string(path)?)?;
+        for planet in &mut system.planets {
+            planet.orbit.mu = system.star.μ;
+        }
+        Ok(system)
     }
 
-    pub fn into_planets(self) -> Vec<Orbit3D<EllipticOrbit>> {
+    pub fn into_planets(self) -> Vec<(CelestialBody, Orbit3D<EllipticOrbit>)> {
         let μ = self.star.μ;
         self.planets
             .into_iter()
-            .map(|planet| -> Orbit3D<EllipticOrbit> {
+            .map(|planet| {
                 let orbit: EllipticOrbit = Orbit2DBuilder::default()
                     .std_grav_param(μ)
                     .semi_major_axis(planet.orbit.a)
@@ -61,14 +86,21 @@ impl StarSystem {
                     .build()
                     .unwrap()
                     .into();
-                Orbit3DBuilder::default()
+                let orbit = Orbit3DBuilder::default()
                     .orbit_2d(orbit)
                     .inclination(planet.orbit.i.to_radians())
                     .long_of_asc_node(planet.orbit.Ω.to_radians())
                     .arg_of_periapsis(planet.orbit.ω.to_radians())
                     .build()
-                    .unwrap()
+                    .unwrap();
+                (planet.body, orbit)
             })
             .collect()
+    }
+}
+
+impl Config {
+    pub fn load_from_yaml(path: &str) -> anyhow::Result<Self> {
+        Ok(serde_saphyr::from_str(&std::fs::read_to_string(path)?)?)
     }
 }
