@@ -1,5 +1,5 @@
 # All units in km seconds and degrees. M0 in rad, elements for epoch J2000.0
-epoch: 2000-01-01T00:00:00Z
+epoch: 2000-01-01T12:00:00Z
 star:
   name: Sun
   μ: 132712440018
