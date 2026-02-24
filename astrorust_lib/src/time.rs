@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Time(f64);
 
 impl Time {

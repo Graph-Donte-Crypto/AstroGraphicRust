@@ -97,7 +97,7 @@ fn main() {
         .and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap())
         .and_utc();
     let started_at_date =
-        chrono::DateTime::parse_from_rfc3339("1977-08-20T14:29:00Z").unwrap().to_utc();
+        chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
     let started_at = Instant::now();
     while window.render_with_camera(&mut camera) {
         // gui_lib::draw_full_axes(&mut window, 100.0, STAR_RADIUS);
@@ -134,7 +134,7 @@ fn main() {
 
             dbg!("Flyby end: ", &r, &v, &delta_v, delta_v.magnitude());
 
-            r = ((orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4)) + 100.0) * r.normalize();
+            r = ((orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4))) * r.normalize();
 
             // Convert planetocentric state vectors back to heliocentric
             r += planet_r;
