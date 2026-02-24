@@ -7,8 +7,8 @@ use crate::time::Time;
 
 use super::Orbit2D;
 
-#[derive(Debug)]
-pub struct HyperbolicOrbit(Orbit2D);
+#[derive(Debug, Clone)]
+pub struct HyperbolicOrbit(pub Orbit2D);
 
 impl HyperbolicOrbit {
     fn r_from_sinh_cosh_H(&self, (sinh_H, cosh_H): (f64, f64)) -> Vector2<f64> {
@@ -33,6 +33,12 @@ impl HyperbolicOrbit {
     }
 }
 
+impl From<Orbit2D> for HyperbolicOrbit {
+    fn from(value: Orbit2D) -> Self {
+        Self(value)
+    }
+}
+
 impl StateVectorTypes for HyperbolicOrbit {
     type Position = Vector2<f64>;
     type Velocity = Vector2<f64>;
@@ -51,7 +57,6 @@ impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
 
     fn position_and_velocity(&self, M: MeanAnomaly) -> (Self::Position, Self::Velocity) {
         let H: HypAnomaly = M.into_anomaly(self.0.e);
-        dbg!(M, H);
         let sinh_cosh_H = H.sinh_cosh();
         (self.r_from_sinh_cosh_H(sinh_cosh_H), self.v_from_sinh_cosh_H(sinh_cosh_H))
     }

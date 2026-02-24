@@ -2,7 +2,7 @@ use crate::state_vectors::{StateVectorTypes, StateVectors};
 use nalgebra::Matrix3x2;
 use std::ops::Mul;
 
-#[derive(Builder, CopyGetters, Debug)]
+#[derive(Builder, CopyGetters, Debug, Clone)]
 // #[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit3D<O> {
     #[builder(setter)]
@@ -36,7 +36,6 @@ impl<O> Orbit3D<O> {
         &self.orb_to_ecl
     }
 }
-
 
 impl<O: StateVectorTypes> StateVectorTypes for Orbit3D<O>
 where
