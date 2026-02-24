@@ -1,0 +1,11 @@
+- [ ] Set planet colors in solar.yml and kerbal.yml instead of in-code const
+- [ ] `impl From<astrorust_lib::config::Orbit> for Trajectory`
+- [ ] New methods `Orbit3D::from_state_vectors(mu, r, v) -> Orbit3D` and same for `Trajectory`
+- [ ] Display time warp using `.draw_text`
+- [ ] Time warp controls on `[` and `]` keys like in KSP
+- [ ] Spacecraft should be able to orbit planets, not just the Sun (to correctly simulate Jupiter gravity assists, as spacecraft spends quite a lot of time in its sphere of influence)
+- [ ] Spacecraft 3D model instead of the damn sphere
+- [ ] Show spacecraft current orbit using `.draw_text`
+- [ ] Update to latest kiss3d
+- [ ] Run on wayland
+- [ ] Use arcball camera to have KSP experience

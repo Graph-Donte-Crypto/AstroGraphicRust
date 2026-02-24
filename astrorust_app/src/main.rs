@@ -3,7 +3,7 @@ use astrorust_gui_lib::kiss3d::camera::Camera;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::Point2;
-use astrorust_lib::angle::{Angle, EccAnomaly};
+use astrorust_lib::angle::Angle;
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::flat::hyperbolic::HyperbolicOrbit;
@@ -13,7 +13,6 @@ use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
 use chrono::{Duration, NaiveDate, NaiveTime};
-use core::f64::consts::PI;
 use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
@@ -21,9 +20,8 @@ use na::{Point3, Translation3, Vector3};
 use std::f64::consts::TAU;
 use std::time::Instant;
 
-const CAMERA_ACCELERATION: f64 = 0.001;
+const CAMERA_ACCELERATION: f64 = 0.0;
 const TIME_WARP: f64 = 5_000_000.0;
-// const TIME_WARP: f64 = 1.0;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
 const PLANET_COLORS: &[Point3<f32>] = &[
@@ -253,10 +251,14 @@ fn main() {
             &Font::default(),
             &Point3::new(1.0, 1.0, 1.0),
         );
-        // camera.frame.set_eye(
-        //     &(&eye + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32 * eye.coords.normalize()),
-        //     &Vector3::new(0.0, 0.0, 1.0),
-        // );
+        if CAMERA_ACCELERATION > f64::EPSILON {
+            camera.frame.set_eye(
+                &(&eye
+                    + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32
+                        * eye.coords.normalize()),
+                &Vector3::new(0.0, 0.0, 1.0),
+            );
+        }
     }
 }
 
@@ -333,15 +335,11 @@ fn create_body(
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
-    let pe = Point3::from(orbit.position(EccAnomaly::from(Angle::from_rad(0.0))))
-        .map(|x| (scale * x) as f32);
-    let ap = Point3::from(orbit.position(EccAnomaly::from(Angle::from_rad(PI))))
-        .map(|x| (scale * x) as f32);
 
     let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
     sphere.set_color(color.x, color.y, color.z);
 
-    Body { sphere, body, orbit, points, pe, ap, color }
+    Body { sphere, body, orbit, points, color }
 }
 
 fn create_spacecraft(
@@ -354,10 +352,6 @@ fn create_spacecraft(
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
-    // let pe = Point3::from(orbit.position(EccAnomaly::from(Angle::from_rad(0.0))))
-    //     .map(|x| (scale * x) as f32);
-    // let ap = Point3::from(orbit.position(EccAnomaly::from(Angle::from_rad(PI))))
-    //     .map(|x| (scale * x) as f32);
 
     let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
     sphere.set_color(color.x, color.y, color.z);
@@ -370,8 +364,6 @@ struct Body {
     body: CelestialBody,
     orbit: Orbit3D<EllipticOrbit>,
     points: Vec<Point3<f32>>,
-    pe: Point3<f32>,
-    ap: Point3<f32>,
     color: Point3<f32>,
 }
 
@@ -379,7 +371,5 @@ struct Spacecraft {
     sphere: SceneNode,
     orbit: Trajectory,
     points: Vec<Point3<f32>>,
-    // pe: Point3<f32>,
-    // ap: Point3<f32>,
     color: Point3<f32>,
 }
