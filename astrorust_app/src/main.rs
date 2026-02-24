@@ -64,22 +64,43 @@ fn main() {
         .chain(system.planets.iter().map(|planet| (planet.body.name.as_str(), planet.body.μ)))
         .find(|(name, _)| *name == config.spacecraft.body)
         .expect(&format!("Body `{}` not found", config.spacecraft.body));
-    let spacecraft: EllipticOrbit = Orbit2DBuilder::default()
-        .std_grav_param(spacecraft_μ)
-        .semi_major_axis(config.spacecraft.orbit.a)
-        .eccentricity(config.spacecraft.orbit.e)
-        .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
-        .build()
-        .unwrap()
-        .into();
-    let spacecraft: Trajectory = Orbit3DBuilder::default()
-        .orbit_2d(spacecraft)
-        .inclination(config.spacecraft.orbit.i.to_radians())
-        .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
-        .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
-        .build()
-        .unwrap()
-        .into();
+    let spacecraft = if config.spacecraft.orbit.a >= 0.0 {
+        let spacecraft: EllipticOrbit = Orbit2DBuilder::default()
+            .std_grav_param(spacecraft_μ)
+            .semi_major_axis(config.spacecraft.orbit.a)
+            .eccentricity(config.spacecraft.orbit.e)
+            .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
+            .build()
+            .unwrap()
+            .into();
+        let spacecraft: Trajectory = Orbit3DBuilder::default()
+            .orbit_2d(spacecraft)
+            .inclination(config.spacecraft.orbit.i.to_radians())
+            .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
+            .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
+            .build()
+            .unwrap()
+            .into();
+        spacecraft
+    } else {
+        let spacecraft: HyperbolicOrbit = Orbit2DBuilder::default()
+            .std_grav_param(spacecraft_μ)
+            .semi_major_axis(config.spacecraft.orbit.a)
+            .eccentricity(config.spacecraft.orbit.e)
+            .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
+            .build()
+            .unwrap()
+            .into();
+        let spacecraft: Trajectory = Orbit3DBuilder::default()
+            .orbit_2d(spacecraft)
+            .inclination(config.spacecraft.orbit.i.to_radians())
+            .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
+            .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
+            .build()
+            .unwrap()
+            .into();
+        spacecraft
+    };
     let mut spacecraft =
         create_spacecraft(&mut window, scale, spacecraft, Point3::new(1.0, 1.0, 1.0));
 
@@ -134,7 +155,7 @@ fn main() {
 
             dbg!("Flyby end: ", &r, &v, &delta_v, delta_v.magnitude());
 
-            r = ((orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4))) * r.normalize();
+            r = (orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4)) * r.normalize();
 
             // Convert planetocentric state vectors back to heliocentric
             r += planet_r;
@@ -289,7 +310,11 @@ fn draw_orbit_and_current_position_of_spacecraft(
     spacecraft.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 
     window.draw_text(
-        &format!("Distance: {:.1} au\nSpeed:     {:.1} km/s", r.magnitude() / 149597870.700, v.magnitude()),
+        &format!(
+            "Distance: {:.1} au\nSpeed:     {:.1} km/s",
+            r.magnitude() / 149597870.700,
+            v.magnitude()
+        ),
         &Point2::new(0.0, 60.0),
         60.0,
         &Font::default(),
