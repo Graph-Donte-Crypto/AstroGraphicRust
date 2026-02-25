@@ -3,12 +3,9 @@ use astrorust_gui_lib::kiss3d::camera::Camera;
 use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
-use astrorust_lib::angle::Angle;
-use astrorust_lib::config::{CelestialBody, Config, StarSystem};
+use astrorust_lib::config::{CelestialBody, Config, Orbit, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
-use astrorust_lib::orbit::flat::hyperbolic::HyperbolicOrbit;
-use astrorust_lib::orbit::flat::Orbit2DBuilder;
-use astrorust_lib::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
+use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
@@ -53,43 +50,9 @@ fn main() {
         }))
         .find(|(name, _)| *name == config.spacecraft.body)
         .expect(&format!("Body `{}` not found", config.spacecraft.body));
-    let spacecraft = if config.spacecraft.orbit.a >= 0.0 {
-        let spacecraft: EllipticOrbit = Orbit2DBuilder::default()
-            .std_grav_param(spacecraft_μ)
-            .semi_major_axis(config.spacecraft.orbit.a)
-            .eccentricity(config.spacecraft.orbit.e)
-            .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
-            .build()
-            .unwrap()
-            .into();
-        let spacecraft: Trajectory = Orbit3DBuilder::default()
-            .orbit_2d(spacecraft)
-            .inclination(config.spacecraft.orbit.i.to_radians())
-            .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
-            .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
-            .build()
-            .unwrap()
-            .into();
-        spacecraft
-    } else {
-        let spacecraft: HyperbolicOrbit = Orbit2DBuilder::default()
-            .std_grav_param(spacecraft_μ)
-            .semi_major_axis(config.spacecraft.orbit.a)
-            .eccentricity(config.spacecraft.orbit.e)
-            .mean_anomaly_at_t0(Angle::from_rad(config.spacecraft.orbit.M0).into())
-            .build()
-            .unwrap()
-            .into();
-        let spacecraft: Trajectory = Orbit3DBuilder::default()
-            .orbit_2d(spacecraft)
-            .inclination(config.spacecraft.orbit.i.to_radians())
-            .long_of_asc_node(config.spacecraft.orbit.Ω.to_radians())
-            .arg_of_periapsis(config.spacecraft.orbit.ω.to_radians())
-            .build()
-            .unwrap()
-            .into();
-        spacecraft
-    };
+    let mut spacecraft_orbit = config.spacecraft.orbit.clone();
+    spacecraft_orbit.mu = spacecraft_μ;
+    let spacecraft: Trajectory = spacecraft_orbit.into();
     let mut spacecraft =
         create_spacecraft(&mut window, scale, spacecraft, Point3::new(1.0, 1.0, 1.0));
 
@@ -188,43 +151,16 @@ fn main() {
                 M0
             };
 
-            let new_orbit: Trajectory = if a >= 0.0 {
-                let new_orbit: EllipticOrbit = Orbit2DBuilder::default()
-                    .std_grav_param(system.star.μ)
-                    .semi_major_axis(a)
-                    .eccentricity(e)
-                    .mean_anomaly_at_t0(Angle::from_rad(M0).into())
-                    .build()
-                    .unwrap()
-                    .into();
-                let new_orbit = Orbit3DBuilder::default()
-                    .orbit_2d(new_orbit)
-                    .inclination(i)
-                    .long_of_asc_node(Ω)
-                    .arg_of_periapsis(ω)
-                    .build()
-                    .unwrap()
-                    .into();
-                new_orbit
-            } else {
-                let new_orbit: HyperbolicOrbit = Orbit2DBuilder::default()
-                    .std_grav_param(system.star.μ)
-                    .semi_major_axis(a)
-                    .eccentricity(e)
-                    .mean_anomaly_at_t0(Angle::from_rad(M0).into())
-                    .build()
-                    .unwrap()
-                    .into();
-                let new_orbit = Orbit3DBuilder::default()
-                    .orbit_2d(new_orbit)
-                    .inclination(i)
-                    .long_of_asc_node(Ω)
-                    .arg_of_periapsis(ω)
-                    .build()
-                    .unwrap()
-                    .into();
-                new_orbit
-            };
+            let new_orbit: Trajectory = Orbit {
+                mu: system.star.μ,
+                a,
+                e,
+                i: i.to_degrees(),
+                Ω: Ω.to_degrees(),
+                ω: ω.to_degrees(),
+                M0,
+            }
+            .into();
             dbg!(&spacecraft.orbit, &new_orbit);
             spacecraft.orbit = new_orbit.into();
             // let soi_radius = orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4);
@@ -305,7 +241,12 @@ fn draw_orbit_and_current_position_of_spacecraft(
     );
 }
 
-fn create_body(window: &mut Window, scale: f64, body: CelestialBody, orbit: Orbit3D<EllipticOrbit>) -> Body {
+fn create_body(
+    window: &mut Window,
+    scale: f64,
+    body: CelestialBody,
+    orbit: Orbit3D<EllipticOrbit>,
+) -> Body {
     let points = gui_lib::generate_orbit_points(&orbit, 100)
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))

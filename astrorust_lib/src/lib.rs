@@ -12,5 +12,5 @@ pub mod kepler_equation;
 pub mod orbit;
 pub mod state_vectors;
 pub mod time;
-pub mod util;
 pub mod trajectory;
+pub mod util;

@@ -292,8 +292,11 @@ impl HyperbolaSolver {
         f1 * mean_anomaly.signum()
     }
 }
+
+#[cfg(test)]
 const BISECTION_ITERATIONS: usize = 64;
 
+#[cfg(test)]
 fn bisection(function: &impl Fn(f64) -> f64, min: f64, max: f64) -> f64 {
     let mut low = min;
     let mut high = max;

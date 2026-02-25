@@ -1,5 +1,5 @@
 - [x] Set planet colors in solar.yml and kerbal.yml instead of in-code const
-- [ ] `impl From<astrorust_lib::config::Orbit> for Trajectory`
+- [x] `impl From<astrorust_lib::config::Orbit> for Trajectory`
 - [ ] New methods `Orbit3D::from_state_vectors(mu, r, v) -> Orbit3D` and same for `Trajectory`
 - [ ] Display time warp using `.draw_text`
 - [ ] Time warp controls on `[` and `]` keys like in KSP
