@@ -6,12 +6,14 @@ star:
   radius: 696340
   atmosphere_height: 0
   siderial_day: 2192832
+  color: "#ffd24d"
 planets:
   - name: Mercury
     μ: 22031.86855
     radius: 2439.7
     atmosphere_height: 0
     siderial_day: 5067031
+    color: "#a6a6a6"
     orbit:
       a: 57909068
       e: 0.20563593
@@ -24,6 +26,7 @@ planets:
     radius: 6051.8
     atmosphere_height: 250
     siderial_day: -20996760
+    color: "#f2d98c"
     orbit:
       a: 108208000
       e: 0.00677672
@@ -36,6 +39,7 @@ planets:
     radius: 6378.137
     atmosphere_height: 100
     siderial_day: 86164
+    color: "#004dcc"
     orbit:
       a: 149598023
       e: 0.0167086
@@ -48,6 +52,7 @@ planets:
     radius: 3396.2
     atmosphere_height: 125
     siderial_day: 88642
+    color: "#cc661a"
     orbit:
       a: 227939200
       e: 0.09339410
@@ -60,6 +65,7 @@ planets:
     radius: 71492
     atmosphere_height: 5000
     siderial_day: 35730
+    color: "#e6bf80"
     orbit:
       a: 778570000
       e: 0.04838624
@@ -72,6 +78,7 @@ planets:
     radius: 60268
     atmosphere_height: 6000
     siderial_day: 38340
+    color: "#d9bf66"
     orbit:
       a: 1433530000
       e: 0.05386179
@@ -84,6 +91,7 @@ planets:
     radius: 25559
     atmosphere_height: 2500
     siderial_day: -62064
+    color: "#80cce6"
     orbit:
       a: 2872460000
       e: 0.04725744
@@ -96,6 +104,7 @@ planets:
     radius: 24764
     atmosphere_height: 2500
     siderial_day: 57996
+    color: "#1a4dcc"
     orbit:
       a: 4504440000
       e: 0.00859048
@@ -108,6 +117,7 @@ planets:
     radius: 1188.3
     atmosphere_height: 0
     siderial_day: -551856
+    color: "#f2e6d9"
     orbit:
       a: 5906376272
       e: 0.24880766

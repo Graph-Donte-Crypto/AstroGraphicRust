@@ -5,12 +5,14 @@ star:
   radius: 2616000
   atmosphere_height: 600
   siderial_day: 432000
+  color: "#ffd24d"
 planets:
   - name: Moho
     μ: 168.60938
     radius: 250
     atmosphere_height: 0
     siderial_day: 121000
+    color: "#7d776e"
     orbit:
       a: 5263138.304
       e: 0.2
@@ -23,6 +25,7 @@ planets:
     radius: 700
     atmosphere_height: 90
     siderial_day: 80500
+    color: "#9558b0"
     orbit:
       a: 9832684.544
       e: 0.01
@@ -36,6 +39,7 @@ planets:
         radius: 13
         atmosphere_height: 0
         siderial_day: 28255
+        color: "#9d978f"
         orbit:
           a: 31500
           e: 0.55
@@ -48,6 +52,7 @@ planets:
     radius: 600
     atmosphere_height: 70
     siderial_day: 21549.425
+    color: "#4084b2"
     orbit:
       a: 13599840.256
       e: 0
@@ -61,6 +66,7 @@ planets:
         radius: 200
         atmosphere_height: 0
         siderial_day: 138984.38
+        color: "#8f9297"
         orbit:
           a: 12000
           e: 0
@@ -73,6 +79,7 @@ planets:
         radius: 60
         atmosphere_height: 0
         siderial_day: 40400
+        color: "#b8f0db"
         orbit:
           a: 47000
           e: 0
@@ -85,6 +92,7 @@ planets:
     radius: 320
     atmosphere_height: 50
     siderial_day: 65517.859
+    color: "#b36342"
     orbit:
       a: 20726155.264
       e: 0.051
@@ -98,6 +106,7 @@ planets:
         radius: 130
         atmosphere_height: 0
         siderial_day: 65517.862
+        color: "#6e6e67"
         orbit:
           a: 3200
           e: 0.03
@@ -110,6 +119,7 @@ planets:
     radius: 138
     atmosphere_height: 0
     siderial_day: 34800
+    color: "#ababa1"
     orbit:
       a: 40839348.203
       e: 0.145
@@ -122,6 +132,7 @@ planets:
     radius: 6000
     atmosphere_height: 200
     siderial_day: 36000
+    color: "#78b04a"
     orbit:
       a: 68773560.32
       e: 0.05
@@ -135,6 +146,7 @@ planets:
         radius: 500
         atmosphere_height: 50
         siderial_day: 52980.879
+        color: "#2f6f95"
         orbit:
           a: 2718.4
           e: 0
@@ -147,6 +159,7 @@ planets:
         radius: 300
         atmosphere_height: 0
         siderial_day: 105962.09
+        color: "#9fd8dc"
         orbit:
           a: 4315.2
           e: 0
@@ -159,6 +172,7 @@ planets:
         radius: 600
         atmosphere_height: 0
         siderial_day: 211926.36
+        color: "#b6b8b0"
         orbit:
           a: 68500
           e: 0
@@ -171,6 +185,7 @@ planets:
         radius: 65
         atmosphere_height: 0
         siderial_day: 544507.43
+        color: "#7f6a5a"
         orbit:
           a: 128500
           e: 0.235
@@ -183,6 +198,7 @@ planets:
         radius: 44
         atmosphere_height: 0
         siderial_day: 901902.62
+        color: "#d6cc8f"
         orbit:
           a: 179890
           e: 0.171
@@ -195,6 +211,7 @@ planets:
     radius: 210
     atmosphere_height: 0
     siderial_day: 19460
+    color: "#d6e2eb"
     orbit:
       a: 90118820
       e: 0.26

@@ -24,17 +24,6 @@ const CAMERA_ACCELERATION: f64 = 0.0;
 const TIME_WARP: f64 = 5_000_000.0;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
-const PLANET_COLORS: &[Point3<f32>] = &[
-    Point3::new(0.65, 0.65, 0.65), // Mercury (grayish)
-    Point3::new(0.95, 0.85, 0.55), // Venus (yellowish-white)
-    Point3::new(0.0, 0.3, 0.8),    // Earth (blue with green and brown)
-    Point3::new(0.8, 0.4, 0.1),    // Mars (reddish-brown)
-    Point3::new(0.9, 0.75, 0.5),   // Jupiter (orange with white and brown)
-    Point3::new(0.85, 0.75, 0.4),  // Saturn (pale gold)
-    Point3::new(0.5, 0.8, 0.9),    // Uranus (light blue-green)
-    Point3::new(0.1, 0.3, 0.8),    // Neptune (deep blue)
-    Point3::new(0.95, 0.9, 0.85),  // Pluto (light brown/off-white)
-];
 
 fn main() {
     let mut window = Window::new("Astro Graphic Rust");
@@ -55,11 +44,13 @@ fn main() {
         .clone()
         .into_planets()
         .into_iter()
-        .zip(PLANET_COLORS)
-        .map(|((body, orbit), color)| create_body(&mut window, scale, orbit, color.clone(), body))
+        .map(|(body, orbit)| create_body(&mut window, scale, body, orbit))
         .collect();
     let (_, spacecraft_μ) = std::iter::once((system.star.name.as_str(), system.star.μ))
         .chain(system.planets.iter().map(|planet| (planet.body.name.as_str(), planet.body.μ)))
+        .chain(system.planets.iter().flat_map(|planet| {
+            planet.moons.iter().map(|moon| (moon.body.name.as_str(), moon.body.μ))
+        }))
         .find(|(name, _)| *name == config.spacecraft.body)
         .expect(&format!("Body `{}` not found", config.spacecraft.body));
     let spacecraft = if config.spacecraft.orbit.a >= 0.0 {
@@ -314,17 +305,12 @@ fn draw_orbit_and_current_position_of_spacecraft(
     );
 }
 
-fn create_body(
-    window: &mut Window,
-    scale: f64,
-    orbit: Orbit3D<EllipticOrbit>,
-    color: Point3<f32>,
-    body: CelestialBody,
-) -> Body {
+fn create_body(window: &mut Window, scale: f64, body: CelestialBody, orbit: Orbit3D<EllipticOrbit>) -> Body {
     let points = gui_lib::generate_orbit_points(&orbit, 100)
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
+    let color = rgb8_to_color(body.color);
 
     let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
     sphere.set_color(color.x, color.y, color.z);
@@ -347,6 +333,10 @@ fn create_spacecraft(
     sphere.set_color(color.x, color.y, color.z);
 
     Spacecraft { sphere, orbit, points, color }
+}
+
+fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
+    Point3::<f32>::new(r.into(), g.into(), b.into()) / 255.0
 }
 
 struct Body {
