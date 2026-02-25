@@ -1,8 +1,8 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_gui_lib::kiss3d::camera::Camera;
+use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
-use astrorust_gui_lib::na::Point2;
 use astrorust_lib::angle::Angle;
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
@@ -12,7 +12,7 @@ use astrorust_lib::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
 use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
-use chrono::{Duration, NaiveDate, NaiveTime};
+use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
@@ -242,15 +242,15 @@ fn main() {
                 .map(|point| point.map(|x| (scale * x) as f32))
                 .collect();
         }
-        draw_orbit_and_current_position_of_spacecraft(&mut window, &eye, scale, &mut spacecraft, t);
-
-        window.draw_text(
-            &format!("Time: {}", (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M")),
-            &Point2::new(0.0, 0.0),
-            60.0,
-            &Font::default(),
-            &Point3::new(1.0, 1.0, 1.0),
+        draw_orbit_and_current_position_of_spacecraft(
+            &mut window,
+            &eye,
+            scale,
+            &mut spacecraft,
+            t,
+            epoch,
         );
+
         if CAMERA_ACCELERATION > f64::EPSILON {
             camera.frame.set_eye(
                 &(&eye
@@ -271,23 +271,11 @@ fn draw_orbit_and_current_position(
 ) {
     gui_lib::draw_orbit_points(window, &body.points, &body.color, false);
     let r = body.orbit.position(t);
-    // window.draw_line(&planet.pe, &planet.ap, &Point3::new(0.7, 1.0, 0.7));
-    // window.draw_line(&Point3::origin(), &r.map(|x| x as f32).into(), &Point3::new(0.6, 0.6, 1.0));
 
     body.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
     let clamp = (20.0, (50.0 * body.orbit.orbit_2d.0.a().max(149.6 * 1e6) / 90118820.0) as f32);
     let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
     body.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
-
-    // if draw_text {
-    //     window.draw_text(
-    //         &format!("Distance: {:.1} km\nSpeed:     {:.1} km/s", r.magnitude(), v.magnitude()),
-    //         &Point2::new(0.0, 0.0),
-    //         60.0,
-    //         &Font::default(),
-    //         &Point3::new(1.0, 1.0, 1.0),
-    //     );
-    // }
 }
 
 fn draw_orbit_and_current_position_of_spacecraft(
@@ -296,6 +284,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     scale: f64,
     spacecraft: &mut Spacecraft,
     t: Time,
+    epoch: DateTime<Utc>,
 ) {
     let is_hyperbolic = match spacecraft.orbit {
         Trajectory::Elliptic(_) => false,
@@ -313,11 +302,12 @@ fn draw_orbit_and_current_position_of_spacecraft(
 
     window.draw_text(
         &format!(
-            "Distance: {:.1} au\nSpeed:     {:.1} km/s",
+            "Warp: {TIME_WARP}\nTime: {}\nDistance: {:.1} au\nSpeed:     {:.1} km/s",
+            (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
             r.magnitude() / 149597870.700,
             v.magnitude()
         ),
-        &Point2::new(0.0, 60.0),
+        &Point2::origin(),
         60.0,
         &Font::default(),
         &Point3::new(1.0, 1.0, 1.0),
