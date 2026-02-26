@@ -4,6 +4,9 @@ use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
 use crate::state_vectors::{StateVectorTypes, StateVectors};
 use nalgebra::Vector3;
+use std::fmt::{self, Display, Formatter};
+
+const AU_IN_KM: f64 = 149_597_870.700;
 
 #[derive(Debug, Clone)]
 pub enum Trajectory {
@@ -75,6 +78,45 @@ impl From<config::Orbit> for Trajectory {
             Orbit3D::<EllipticOrbit>::from(elements).into()
         } else {
             Orbit3D::<HyperbolicOrbit>::from(elements).into()
+        }
+    }
+}
+
+impl Display for Orbit3D<EllipticOrbit> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "a: {:.6} AU\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            self.orbit_2d.0.a() / AU_IN_KM,
+            self.orbit_2d.0.e(),
+            self.i().to_degrees(),
+            self.Omega().to_degrees(),
+            self.omega().to_degrees(),
+            self.orbit_2d.0.M0().as_deg(),
+        )
+    }
+}
+
+impl Display for Orbit3D<HyperbolicOrbit> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "a: {:.6} AU\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            self.orbit_2d.0.a() / AU_IN_KM,
+            self.orbit_2d.0.e(),
+            self.i().to_degrees(),
+            self.Omega().to_degrees(),
+            self.omega().to_degrees(),
+            self.orbit_2d.0.M0().as_deg(),
+        )
+    }
+}
+
+impl Display for Trajectory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Elliptic(orbit) => write!(f, "{orbit}"),
+            Self::Hyperbolic(orbit) => write!(f, "{orbit}"),
         }
     }
 }

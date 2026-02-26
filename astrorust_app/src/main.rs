@@ -15,6 +15,8 @@ use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
 use na::{Point3, Translation3, Vector3};
+use std::path::Path;
+use std::rc::Rc;
 use std::time::Instant;
 
 const CAMERA_ACCELERATION: f64 = 0.0;
@@ -64,6 +66,7 @@ fn main() {
         &Point3::origin(),
         &Vector3::from([0.0, 0.0, std::f32::consts::PI]),
     );
+    let hud_font = load_ttf_font_from_current_dir();
 
     let epoch = NaiveDate::from_ymd_opt(2000, 1, 1)
         .unwrap()
@@ -116,8 +119,7 @@ fn main() {
             dbg!(r.magnitude(), v.magnitude());
 
             // Calculate new orbit from new state vectors
-            let new_orbit =
-                Trajectory::from_state_vectors(system.star.μ, r, v, t.as_secs());
+            let new_orbit = Trajectory::from_state_vectors(system.star.μ, r, v, t.as_secs());
             dbg!(&spacecraft.orbit, &new_orbit);
             spacecraft.orbit = new_orbit.into();
             // let soi_radius = orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4);
@@ -133,6 +135,7 @@ fn main() {
             &mut spacecraft,
             t,
             epoch,
+            &hud_font,
         );
 
         if CAMERA_ACCELERATION > f64::EPSILON {
@@ -169,6 +172,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     spacecraft: &mut Spacecraft,
     t: Time,
     epoch: DateTime<Utc>,
+    hud_font: &Rc<Font>,
 ) {
     let is_hyperbolic = match spacecraft.orbit {
         Trajectory::Elliptic(_) => false,
@@ -184,19 +188,34 @@ fn draw_orbit_and_current_position_of_spacecraft(
     let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
     spacecraft.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 
+    let telemetry_text = format!(
+        "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} au\nSpeed: {speed:.1} km/s",
+        warp = format_with_thousand_separators(TIME_WARP),
+        time = (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
+        distance = r.magnitude() / 149597870.700,
+        speed = v.magnitude(),
+    );
+    let orbit_text = format!("{orbit}", orbit = spacecraft.orbit);
+    let text_scale = 50.0;
     window.draw_text(
-        &format!(
-            "Warp: {}x\nTime: {}\nDistance: {:.1} au\nSpeed:     {:.1} km/s",
-            format_with_thousand_separators(TIME_WARP),
-            (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
-            r.magnitude() / 149597870.700,
-            v.magnitude()
-        ),
-        &Point2::origin(),
-        60.0,
-        &Font::default(),
+        &telemetry_text,
+        &Point2::new(0.0, 0.0),
+        text_scale,
+        hud_font,
         &Point3::new(1.0, 1.0, 1.0),
     );
+    window.draw_text(
+        &orbit_text,
+        &Point2::new(0.0, text_scale * 5.0),
+        text_scale,
+        hud_font,
+        &Point3::new(1.0, 1.0, 1.0),
+    );
+}
+
+fn load_ttf_font_from_current_dir() -> Rc<Font> {
+    let font_path = Path::new("OpenSans-Regular.ttf");
+    Font::new(font_path).unwrap_or_else(|| panic!("failed to load {}", font_path.display()))
 }
 
 fn create_body(

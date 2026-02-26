@@ -5,7 +5,7 @@
 - [ ] Time warp controls on `[` and `]` keys like in KSP
 - [ ] Spacecraft should be able to orbit planets, not just the Sun (to correctly simulate Jupiter gravity assists, as spacecraft spends quite a lot of time in its sphere of influence)
 - [ ] Spacecraft 3D model instead of the damn sphere
-- [ ] Show spacecraft current orbit using `.draw_text`
+- [x] Show spacecraft current orbit using `.draw_text`
 - [ ] Update to latest kiss3d
 - [ ] Run on wayland
 - [ ] Use arcball camera to have KSP experience
