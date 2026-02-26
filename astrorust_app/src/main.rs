@@ -3,7 +3,7 @@ use astrorust_gui_lib::kiss3d::camera::Camera;
 use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
-use astrorust_lib::config::{CelestialBody, Config, Orbit, StarSystem};
+use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
@@ -15,7 +15,6 @@ use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
 use na::{Point3, Translation3, Vector3};
-use std::f64::consts::TAU;
 use std::time::Instant;
 
 const CAMERA_ACCELERATION: f64 = 0.0;
@@ -117,52 +116,8 @@ fn main() {
             dbg!(r.magnitude(), v.magnitude());
 
             // Calculate new orbit from new state vectors
-            let h = r.cross(&v);
-            let r_mag = r.magnitude();
-            let a = r_mag * system.star.μ / (2.0 * system.star.μ - v.magnitude_squared() * r_mag);
-            let e = v.cross(&r.cross(&v)) / system.star.μ - r.normalize();
-            let i = (h[2] / h.magnitude()).acos();
-            let n = Vector3::z().cross(&h).normalize();
-            let Ω = if n[1] >= 0.0 { n[0].acos() } else { TAU - n[0].acos() };
-            let ω = if e[2] >= 0.0 {
-                (e.dot(&n) / (e.magnitude())).acos()
-            } else {
-                TAU - (e.dot(&n) / (e.magnitude())).acos()
-            };
-            let e = e.magnitude();
-
-            let M0 = if a >= 0.0 {
-                let mut E = ((a - r_mag) / (a * e)).acos();
-                if r.dot(&v) < 0.0 {
-                    E = TAU - E;
-                }
-                let M = E - e * E.sin();
-                let M0 = M - t.as_secs() * (system.star.μ / (a * a * a).abs()).sqrt();
-                let r = a * (1.0 - e * E.cos());
-                dbg!(E, M, M0, r);
-                M0
-            } else {
-                let mut H = ((a - r_mag) / (a * e)).acosh();
-                if r.dot(&v) < 0.0 {
-                    H = -H;
-                }
-                let M = e * H.sinh() - H;
-                let M0 = M - t.as_secs() * (system.star.μ / (a * a * a).abs()).sqrt();
-                let r = a * (1.0 - e * H.cosh());
-                dbg!(H, M, M0, r);
-                M0
-            };
-
-            let new_orbit: Trajectory = Orbit {
-                mu: system.star.μ,
-                a,
-                e,
-                i: i.to_degrees(),
-                Ω: Ω.to_degrees(),
-                ω: ω.to_degrees(),
-                M0,
-            }
-            .into();
+            let new_orbit =
+                Trajectory::from_state_vectors(system.star.μ, r, v, t.as_secs());
             dbg!(&spacecraft.orbit, &new_orbit);
             spacecraft.orbit = new_orbit.into();
             // let soi_radius = orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4);

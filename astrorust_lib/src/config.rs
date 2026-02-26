@@ -1,7 +1,5 @@
-use crate::angle::Angle;
 use crate::orbit::flat::elliptic::EllipticOrbit;
-use crate::orbit::flat::Orbit2DBuilder;
-use crate::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
+use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
 use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -120,19 +118,7 @@ where
 }
 
 fn build_orbit(mu: f64, orbit: &Orbit) -> Orbit3D<EllipticOrbit> {
-    let orbit_2d: EllipticOrbit = Orbit2DBuilder::default()
-        .std_grav_param(mu)
-        .semi_major_axis(orbit.a)
-        .eccentricity(orbit.e)
-        .mean_anomaly_at_t0(Angle::from_rad(orbit.M0).into())
-        .build()
-        .unwrap()
-        .into();
-    Orbit3DBuilder::default()
-        .orbit_2d(orbit_2d)
-        .inclination(orbit.i.to_radians())
-        .long_of_asc_node(orbit.Ω.to_radians())
-        .arg_of_periapsis(orbit.ω.to_radians())
-        .build()
-        .unwrap()
+    let mut orbit = orbit.clone();
+    orbit.mu = mu;
+    Orbit3D::<EllipticOrbit>::from(KeplerianElements::from(orbit))
 }

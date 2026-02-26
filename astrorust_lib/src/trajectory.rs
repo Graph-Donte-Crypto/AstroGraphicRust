@@ -1,9 +1,7 @@
-use crate::angle::Angle;
 use crate::config;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
-use crate::orbit::flat::Orbit2DBuilder;
-use crate::orbit::orbit_3d::{Orbit3D, Orbit3DBuilder};
+use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
 use crate::state_vectors::{StateVectorTypes, StateVectors};
 use nalgebra::Vector3;
 
@@ -11,6 +9,18 @@ use nalgebra::Vector3;
 pub enum Trajectory {
     Elliptic(Orbit3D<EllipticOrbit>),
     Hyperbolic(Orbit3D<HyperbolicOrbit>),
+}
+
+impl Trajectory {
+    pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
+        let r_mag = r.magnitude();
+        let a = r_mag * mu / (2.0 * mu - v.magnitude_squared() * r_mag);
+        if a >= 0.0 {
+            Orbit3D::<EllipticOrbit>::from_state_vectors(mu, r, v, t).into()
+        } else {
+            Orbit3D::<HyperbolicOrbit>::from_state_vectors(mu, r, v, t).into()
+        }
+    }
 }
 
 impl StateVectorTypes for Trajectory {
@@ -59,40 +69,12 @@ impl From<Orbit3D<HyperbolicOrbit>> for Trajectory {
 
 impl From<config::Orbit> for Trajectory {
     fn from(value: config::Orbit) -> Self {
-        if value.a >= 0.0 {
-            let orbit_2d: EllipticOrbit = Orbit2DBuilder::default()
-                .std_grav_param(value.mu)
-                .semi_major_axis(value.a)
-                .eccentricity(value.e)
-                .mean_anomaly_at_t0(Angle::from_rad(value.M0).into())
-                .build()
-                .unwrap()
-                .into();
-            Orbit3DBuilder::default()
-                .orbit_2d(orbit_2d)
-                .inclination(value.i.to_radians())
-                .long_of_asc_node(value.Ω.to_radians())
-                .arg_of_periapsis(value.ω.to_radians())
-                .build()
-                .unwrap()
-                .into()
+        let is_elliptic = value.a >= 0.0;
+        let elements: KeplerianElements = value.into();
+        if is_elliptic {
+            Orbit3D::<EllipticOrbit>::from(elements).into()
         } else {
-            let orbit_2d: HyperbolicOrbit = Orbit2DBuilder::default()
-                .std_grav_param(value.mu)
-                .semi_major_axis(value.a)
-                .eccentricity(value.e)
-                .mean_anomaly_at_t0(Angle::from_rad(value.M0).into())
-                .build()
-                .unwrap()
-                .into();
-            Orbit3DBuilder::default()
-                .orbit_2d(orbit_2d)
-                .inclination(value.i.to_radians())
-                .long_of_asc_node(value.Ω.to_radians())
-                .arg_of_periapsis(value.ω.to_radians())
-                .build()
-                .unwrap()
-                .into()
+            Orbit3D::<HyperbolicOrbit>::from(elements).into()
         }
     }
 }
