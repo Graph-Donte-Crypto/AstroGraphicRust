@@ -58,7 +58,7 @@ fn elements_from_state_vectors(
     mu: f64,
     r: Vector3<f64>,
     v: Vector3<f64>,
-    time_at_state_vectors: f64,
+    t: f64,
 ) -> KeplerianElements {
     let h = r.cross(&v);
     let r_mag = r.magnitude();
@@ -79,13 +79,14 @@ fn elements_from_state_vectors(
         if r.dot(&v) < 0.0 {
             E = TAU - E;
         }
-        E - e * E.sin() - time_at_state_vectors * (mu / (a * a * a).abs()).sqrt()
+        let M0 = E - e * E.sin() - t * (mu / (a * a * a).abs()).sqrt();
+        M0 % TAU
     } else {
         let mut H = ((a - r_mag) / (a * e)).acosh();
         if r.dot(&v) < 0.0 {
             H = -H;
         }
-        e * H.sinh() - H - time_at_state_vectors * (mu / (a * a * a).abs()).sqrt()
+        e * H.sinh() - H - t * (mu / (a * a * a).abs()).sqrt()
     };
 
     KeplerianElements { mu, a, e, i, Omega, omega, M0 }

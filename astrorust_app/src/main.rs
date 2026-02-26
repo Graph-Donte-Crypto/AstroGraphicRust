@@ -181,6 +181,7 @@ fn main() {
             epoch,
             &hud_font,
             time_warp,
+            &planets[2].orbit.position(t),
         );
 
         if CAMERA_ACCELERATION > f64::EPSILON {
@@ -219,6 +220,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     epoch: DateTime<Utc>,
     hud_font: &Rc<Font>,
     time_warp: i64,
+    earth: &Vector3<f64>,
 ) {
     let is_hyperbolic = match spacecraft.orbit {
         Trajectory::Elliptic(_) => false,
@@ -231,11 +233,11 @@ fn draw_orbit_and_current_position_of_spacecraft(
 
     spacecraft.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
     spacecraft.sphere.set_local_rotation(UnitQuaternion::face_towards(
-        &v.normalize().map(|x| x as f32),
-        &Vector3::z(),
+        &-Vector3::z(),
+        &(earth - r).normalize().map(|x| x as f32),
     ));
-    let clamp = (20.0, (50.0 * spacecraft.orbit.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
-    let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
+    let clamp = (400.0, (1000.0 * spacecraft.orbit.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
+    let planet_scale = (eye.coords.magnitude() * 0.4).clamp(clamp.0, clamp.1);
     spacecraft.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 
     let telemetry_text = format!(
@@ -305,8 +307,9 @@ fn create_spacecraft(
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
 
-    let mut sphere = window.add_cube(PLANET_RADIUS, PLANET_RADIUS * 4.0, PLANET_RADIUS * 9.0);
-    sphere.set_color(color.x, color.y, color.z);
+    let mtl_dir = Path::new("models");
+    let obj_path = Path::new("models/voyager.obj");
+    let sphere = window.add_obj(obj_path, mtl_dir, Vector3::new(1.0, 1.0, 1.0));
 
     Spacecraft { sphere, orbit, points, color }
 }

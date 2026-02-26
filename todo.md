@@ -4,7 +4,7 @@
 - [x] Display time warp using `.draw_text`
 - [x] Time warp controls on `[` and `]` keys like in KSP
 - [ ] Spacecraft should be able to orbit planets, not just the Sun (to correctly simulate Jupiter gravity assists, as spacecraft spends quite a lot of time in its sphere of influence)
-- [ ] Spacecraft 3D model instead of the damn sphere
+- [x] Spacecraft 3D model instead of the damn sphere
 - [x] Show spacecraft current orbit using `.draw_text`
 - [ ] Update to latest kiss3d
 - [ ] Run on wayland
