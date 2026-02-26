@@ -3,6 +3,7 @@ use astrorust_gui_lib::kiss3d::camera::Camera;
 use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
+use astrorust_gui_lib::na::UnitQuaternion;
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
@@ -229,7 +230,11 @@ fn draw_orbit_and_current_position_of_spacecraft(
     // window.draw_line(&Point3::origin(), &r.map(|x| x as f32).into(), &Point3::new(0.6, 0.6, 1.0));
 
     spacecraft.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
-    let clamp = (20.0, 50.0);
+    spacecraft.sphere.set_local_rotation(UnitQuaternion::face_towards(
+        &v.normalize().map(|x| x as f32),
+        &Vector3::z(),
+    ));
+    let clamp = (20.0, (50.0 * spacecraft.orbit.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
     let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
     spacecraft.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 
@@ -300,7 +305,7 @@ fn create_spacecraft(
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
 
-    let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
+    let mut sphere = window.add_cube(PLANET_RADIUS, PLANET_RADIUS * 4.0, PLANET_RADIUS * 9.0);
     sphere.set_color(color.x, color.y, color.z);
 
     Spacecraft { sphere, orbit, points, color }
