@@ -9,6 +9,7 @@ use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
+use astrorust_lib::util::format_with_thousand_separators;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
@@ -18,7 +19,7 @@ use std::f64::consts::TAU;
 use std::time::Instant;
 
 const CAMERA_ACCELERATION: f64 = 0.0;
-const TIME_WARP: f64 = 5_000_000.0;
+const TIME_WARP: u64 = 5_000_000;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
 
@@ -76,7 +77,8 @@ fn main() {
         // gui_lib::draw_full_axes(&mut window, 100.0, STAR_RADIUS);
         let eye = camera.eye();
         let real_t = started_at.elapsed().as_secs_f64();
-        let t = Time::from_secs(real_t * TIME_WARP + (started_at_date - epoch).as_seconds_f64());
+        let t =
+            Time::from_secs(real_t * TIME_WARP as f64 + (started_at_date - epoch).as_seconds_f64());
         for planet in &mut planets {
             draw_orbit_and_current_position(&mut window, &eye, scale, planet, t);
         }
@@ -229,7 +231,8 @@ fn draw_orbit_and_current_position_of_spacecraft(
 
     window.draw_text(
         &format!(
-            "Warp: {TIME_WARP}\nTime: {}\nDistance: {:.1} au\nSpeed:     {:.1} km/s",
+            "Warp: {}x\nTime: {}\nDistance: {:.1} au\nSpeed:     {:.1} km/s",
+            format_with_thousand_separators(TIME_WARP),
             (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
             r.magnitude() / 149597870.700,
             v.magnitude()
