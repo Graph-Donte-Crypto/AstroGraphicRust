@@ -16,14 +16,14 @@ pub fn generate_trajectory_points(
     count: usize,
 ) -> Vec<Point3<f64>> {
     match trajectory {
-        Trajectory::Elliptic(orbit) => generate_orbit_points(orbit, count),
+        Trajectory::Elliptic(orbit) => generate_ellipse_points(orbit, count),
         Trajectory::Hyperbolic(orbit) => generate_hyperbola_points(orbit, soi_radius, count),
     }
 }
 
 /// E -- eccentric anomaly
 #[allow(non_snake_case)]
-pub fn generate_orbit_points(orbit: &Orbit3D<EllipticOrbit>, count: usize) -> Vec<Point3<f64>> {
+pub fn generate_ellipse_points(orbit: &Orbit3D<EllipticOrbit>, count: usize) -> Vec<Point3<f64>> {
     let mut E: f64 = 0.0;
     let mut points = Vec::with_capacity(count);
     let dE = TAU / (count as f64);

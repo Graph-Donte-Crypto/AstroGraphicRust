@@ -236,9 +236,9 @@ fn draw_orbit_and_current_position_of_spacecraft(
         &-Vector3::z(),
         &(earth - r).normalize().map(|x| x as f32),
     ));
-    let clamp = (400.0, (1000.0 * spacecraft.orbit.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
-    let planet_scale = (eye.coords.magnitude() * 0.4).clamp(clamp.0, clamp.1);
-    spacecraft.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
+    let clamp = (200.0, (700.0 * spacecraft.orbit.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
+    let scale = (eye.coords.magnitude() * 0.3).clamp(clamp.0, clamp.1);
+    spacecraft.sphere.set_local_scale(scale, scale, scale);
 
     let telemetry_text = format!(
         "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} au\nSpeed: {speed:.1} km/s",
@@ -284,7 +284,7 @@ fn create_body(
     body: CelestialBody,
     orbit: Orbit3D<EllipticOrbit>,
 ) -> Body {
-    let points = gui_lib::generate_orbit_points(&orbit, 100)
+    let points = gui_lib::generate_ellipse_points(&orbit, 100)
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();
