@@ -11,6 +11,7 @@ use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
 use astrorust_lib::util::format_with_thousand_separators;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
+use gui_lib::kiss3d::event::{Action, Key, WindowEvent};
 use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
@@ -20,7 +21,30 @@ use std::rc::Rc;
 use std::time::Instant;
 
 const CAMERA_ACCELERATION: f64 = 0.0;
-const TIME_WARP: u64 = 5_000_000;
+const TIME_WARP_STEPS: [i64; 21] = [
+    -1_000_000_000,
+    -100_000_000,
+    -10_000_000,
+    -1_000_000,
+    -100_000,
+    -10_000,
+    -1_000,
+    -100,
+    -10,
+    -1,
+    0,
+    1,
+    10,
+    100,
+    1_000,
+    10_000,
+    100_000,
+    1_000_000,
+    10_000_000,
+    100_000_000,
+    1_000_000_000,
+];
+const DEFAULT_TIME_WARP_INDEX: usize = 11;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
 
@@ -75,12 +99,31 @@ fn main() {
     let started_at_date =
         chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
     let started_at = Instant::now();
+    let mut previous_frame = Instant::now();
+    let mut simulated_seconds = (started_at_date - epoch).as_seconds_f64();
+    let mut time_warp_index = DEFAULT_TIME_WARP_INDEX;
     while window.render_with_camera(&mut camera) {
+        for event in window.events().iter() {
+            match event.value {
+                WindowEvent::Key(Key::RBracket, Action::Press, _) => {
+                    time_warp_index = (time_warp_index + 1).min(TIME_WARP_STEPS.len() - 1);
+                }
+                WindowEvent::Key(Key::LBracket, Action::Press, _) => {
+                    time_warp_index = time_warp_index.saturating_sub(1);
+                }
+                _ => {}
+            }
+        }
+
         // gui_lib::draw_full_axes(&mut window, 100.0, STAR_RADIUS);
         let eye = camera.eye();
         let real_t = started_at.elapsed().as_secs_f64();
-        let t =
-            Time::from_secs(real_t * TIME_WARP as f64 + (started_at_date - epoch).as_seconds_f64());
+        let now = Instant::now();
+        let real_dt = (now - previous_frame).as_secs_f64();
+        previous_frame = now;
+        let time_warp = TIME_WARP_STEPS[time_warp_index];
+        simulated_seconds += real_dt * time_warp as f64;
+        let t = Time::from_secs(simulated_seconds);
         for planet in &mut planets {
             draw_orbit_and_current_position(&mut window, &eye, scale, planet, t);
         }
@@ -136,6 +179,7 @@ fn main() {
             t,
             epoch,
             &hud_font,
+            time_warp,
         );
 
         if CAMERA_ACCELERATION > f64::EPSILON {
@@ -173,6 +217,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     t: Time,
     epoch: DateTime<Utc>,
     hud_font: &Rc<Font>,
+    time_warp: i64,
 ) {
     let is_hyperbolic = match spacecraft.orbit {
         Trajectory::Elliptic(_) => false,
@@ -190,7 +235,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
 
     let telemetry_text = format!(
         "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} au\nSpeed: {speed:.1} km/s",
-        warp = format_with_thousand_separators(TIME_WARP),
+        warp = format_signed_warp(time_warp),
         time = (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
         distance = r.magnitude() / 149597870.700,
         speed = v.magnitude(),
@@ -211,6 +256,14 @@ fn draw_orbit_and_current_position_of_spacecraft(
         hud_font,
         &Point3::new(1.0, 1.0, 1.0),
     );
+}
+
+fn format_signed_warp(time_warp: i64) -> String {
+    if time_warp < 0 {
+        format!("-{}", format_with_thousand_separators(time_warp.unsigned_abs()))
+    } else {
+        format_with_thousand_separators(time_warp.unsigned_abs())
+    }
 }
 
 fn load_ttf_font_from_current_dir() -> Rc<Font> {
