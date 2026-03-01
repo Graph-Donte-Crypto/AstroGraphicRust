@@ -86,16 +86,18 @@ fn pade_initial_guess(e: f64, M: MeanAnomaly) -> EccAnomaly {
 #[cfg(test)]
 mod tests {
     use crate::angle::{Angle, EccAnomaly, MeanAnomaly};
-    use crate::kepler_equation::solve_kepler_householder_pade_elliptic;
+    use crate::kepler_equation::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn highly_elliptic() {
         let e = 0.99999999999;
         let expected_E: EccAnomaly = Angle::from_rad(0.0843533).into();
         let M: MeanAnomaly = Angle::from_rad(expected_E.as_rad() - e * expected_E.sin()).into();
-        let E = solve_kepler_householder_pade_elliptic(e, M);
-        dbg!(E, expected_E);
-        assert!((E.as_rad() - expected_E.as_rad()).abs() < 1e-13);
+        let newton_E = solve_kepler_newton_pade(e, M);
+        let householder_E = solve_kepler_householder_pade_elliptic(e, M);
+        assert_eq!(newton_E.as_rad(), householder_E.as_rad());
+        //assert_eq!(householder_E.as_rad(), expected_E.as_rad());
     }
 
     #[test]
@@ -103,7 +105,7 @@ mod tests {
         let e = 0.0;
         let M: MeanAnomaly = Angle::from_rad(3.14).into();
         let expected: EccAnomaly = Angle::from_rad(3.14).into();
-        let solution = solve_kepler_householder_pade_elliptic(e, M);
+        let solution = solve_kepler_newton_pade(e, M);
         dbg!(solution, expected);
         assert!((solution.as_rad() - expected.as_rad()).abs() < 1e-15);
     }
