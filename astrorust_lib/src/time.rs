@@ -29,10 +29,12 @@ impl From<Time> for chrono::Duration {
     fn from(time: Time) -> chrono::Duration {
         let duration =
             chrono::Duration::from_std(Duration::from_secs_f64(time.as_secs().abs())).unwrap();
-        if time.as_secs() >= 0.0 {
-            duration
-        } else {
-            -duration
-        }
+        if time.as_secs() >= 0.0 { duration } else { -duration }
+    }
+}
+
+impl From<chrono::Duration> for Time {
+    fn from(duration: chrono::Duration) -> Time {
+        Self::from_secs(duration.as_seconds_f64())
     }
 }

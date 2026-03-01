@@ -259,6 +259,7 @@ dependencies = [
  "defmt",
  "num-traits",
  "pure-rust-locales",
+ "serde",
 ]
 
 [[package]]

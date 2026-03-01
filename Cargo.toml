@@ -1,5 +1,6 @@
 [workspace]
 members = ["astrorust_app", "astrorust_gui_lib", "astrorust_lib"]
+resolver = "3"
 
 [profile.bench]
 lto = "thin"

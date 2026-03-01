@@ -1,5 +1,6 @@
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -10,12 +11,14 @@ pub struct Config {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Spacecraft {
+    pub t0: DateTime<Utc>,
     pub body: String,
     pub orbit: Orbit,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct StarSystem {
+    pub t0: DateTime<Utc>,
     pub star: CelestialBody,
     pub planets: Vec<Planet>,
 }

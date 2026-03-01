@@ -24,12 +24,11 @@ impl HyperbolicOrbit {
 
     /// sinh and cosh of hyperbolic anomaly
     fn sinh_cosh_H_from_nu(&self, nu: TrueAnomaly, e: f64) -> (f64, f64) {
-        // FIXME: use hyperbolic
         let (sin_nu, cos_nu) = nu.sin_cos();
         let inv_denominator = e.mul_add(cos_nu, 1.0).recip();
-        let sin_E = self.0.e_root * sin_nu * inv_denominator;
-        let cos_E = (e + cos_nu) * inv_denominator;
-        (sin_E, cos_E)
+        let sinh_E = self.0.e_root * sin_nu * inv_denominator;
+        let cosh_E = (e + cos_nu) * inv_denominator;
+        (sinh_E, cosh_E)
     }
 }
 

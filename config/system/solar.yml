@@ -1,5 +1,5 @@
 # All units in km seconds and degrees. M0 in rad, elements for epoch J2000.0
-epoch: 2000-01-01T12:00:00Z
+t0: 2000-01-01T12:00:00Z
 star:
   name: Sun
   μ: 132712440018
@@ -61,18 +61,18 @@ planets:
       ω: 286.50283
       M0: 0.33861
   - name: Jupiter
-    μ: 126712764.1
+    μ: 1.266865319e8
     radius: 71492
     atmosphere_height: 5000
     siderial_day: 35730
     color: "#e6bf80"
     orbit:
-      a: 778570000
+      a: 778340000
       e: 0.04838624
-      i: 1.30440
-      Ω: 100.47391
-      ω: 274.41357
-      M0: 0.34357
+      i: 1.30439695
+      Ω: 100.473909
+      ω: 274.25456983
+      M0: 0.343270671
   - name: Saturn
     μ: 37940584.8418
     radius: 60268

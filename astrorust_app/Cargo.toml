@@ -5,7 +5,7 @@ authors = [
   "Graph-Donte-Crypto <Dimasik841@gmail.com>",
   "Artur Sinila <freesoftware@logarithmus.dev>",
 ]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 astrorust_lib = { path = "../astrorust_lib" }

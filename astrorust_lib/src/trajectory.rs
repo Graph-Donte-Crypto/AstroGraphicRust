@@ -22,6 +22,13 @@ impl Trajectory {
         }
     }
 
+    pub fn t0(&self) -> f64 {
+        match self {
+            Trajectory::Elliptic(orbit3_d) => orbit3_d.orbit_2d.0.a(),
+            Trajectory::Hyperbolic(orbit3_d) => orbit3_d.orbit_2d.0.a(),
+        }
+    }
+
     pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
         let r_mag = r.magnitude();
         let a = r_mag * mu / (2.0 * mu - v.magnitude_squared() * r_mag);

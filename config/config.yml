@@ -1,5 +1,6 @@
 system: solar
 spacecraft:
+  t0: 1977-08-23T11:29:11Z
   body: Sun
   orbit:
     # Some hyperbola
@@ -16,7 +17,7 @@ spacecraft:
     i: 4.825717
     Ω: -32.940520
     ω: 11.702680
-    M0: 1.3660219116
+    M0: 6.2676797497
     #
     # Voyager 2 jupiter to saturn
     # a: -2220315000
