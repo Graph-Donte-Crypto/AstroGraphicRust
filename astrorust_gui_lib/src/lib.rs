@@ -64,7 +64,7 @@ pub fn draw_orbit_points(
 ) {
     for i in 0..points.len() - 1 {
         window.draw_line(&points[i], &points[i + 1], color);
-        //window.draw_point(&points[i], color);
+        // window.draw_point(&points[i], color);
     }
     if !is_hyperbolic {
         window.draw_line(&points[0], &points[points.len() - 1], color);
