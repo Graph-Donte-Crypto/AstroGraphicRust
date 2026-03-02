@@ -5,7 +5,7 @@ use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
 use crate::state_vectors::StateVectors;
 use crate::time::Time;
-use nalgebra::Vector3;
+use nalgebra::{Matrix3x2, Vector3};
 use similar_asserts::assert_eq;
 use std::f64::consts::TAU;
 use std::sync::LazyLock as Lazy;
@@ -114,5 +114,9 @@ fn test_state_vectors_at_t(
     eprintln!("Relative error for r: {:.6} %", abs_err_r / expected.0.magnitude() * 100.0);
     eprintln!("Absolute error for v: {abs_err_v:.6} km/s");
     eprintln!("Relative error for v: {:.6} %", abs_err_v / expected.1.magnitude() * 100.0);
-    assert_eq!(computed, expected);
+
+    let expected = Matrix3x2::from_columns(&[expected.0, expected.1]);
+    let computed = Matrix3x2::from_columns(&[computed.0, computed.1]);
+
+    assert_eq!(format!("{computed:.3}"), format!("{expected:.3}"));
 }

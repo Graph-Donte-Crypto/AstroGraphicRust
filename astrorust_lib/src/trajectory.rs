@@ -2,8 +2,9 @@ use crate::config;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
-use crate::state_vectors::{StateVectorTypes, StateVectors};
-use nalgebra::Vector3;
+use crate::state_vectors::StateVectors;
+use nalgebra::{Matrix3x2, Vector3};
+use std::ops::Mul;
 use std::fmt::{self, Display, Formatter};
 
 const AU_IN_KM: f64 = 149_597_870.700;
@@ -40,16 +41,18 @@ impl Trajectory {
     }
 }
 
-impl StateVectorTypes for Trajectory {
-    type Position = Vector3<f64>;
-    type Velocity = Vector3<f64>;
-}
-
 impl<P: Copy> StateVectors<P> for Trajectory
 where
     EllipticOrbit: StateVectors<P>,
     HyperbolicOrbit: StateVectors<P>,
+    Matrix3x2<f64>: Mul<<EllipticOrbit as StateVectors<P>>::Position, Output = Vector3<f64>>,
+    Matrix3x2<f64>: Mul<<EllipticOrbit as StateVectors<P>>::Velocity, Output = Vector3<f64>>,
+    Matrix3x2<f64>: Mul<<HyperbolicOrbit as StateVectors<P>>::Position, Output = Vector3<f64>>,
+    Matrix3x2<f64>: Mul<<HyperbolicOrbit as StateVectors<P>>::Velocity, Output = Vector3<f64>>,
 {
+    type Position = Vector3<f64>;
+    type Velocity = Vector3<f64>;
+
     fn position(&self, param: P) -> Self::Position {
         match self {
             Trajectory::Elliptic(orbit) => orbit.position(param),

@@ -1,7 +1,7 @@
 use nalgebra::Vector2;
 
 use crate::angle::{EccAnomaly, IntoAnomaly, MeanAnomaly, TrueAnomaly};
-use crate::state_vectors::{StateVectorTypes, StateVectors};
+use crate::state_vectors::StateVectors;
 use crate::time::Time;
 
 use super::Orbit2D;
@@ -42,12 +42,10 @@ impl EllipticOrbit {
     }
 }
 
-impl StateVectorTypes for EllipticOrbit {
+impl StateVectors<MeanAnomaly> for EllipticOrbit {
     type Position = Vector2<f64>;
     type Velocity = Vector2<f64>;
-}
 
-impl StateVectors<MeanAnomaly> for EllipticOrbit {
     fn position(&self, M: MeanAnomaly) -> Self::Position {
         let E: EccAnomaly = M.into_anomaly(self.0.e);
         self.r_from_sin_cos_E(E.sin_cos())
@@ -66,6 +64,9 @@ impl StateVectors<MeanAnomaly> for EllipticOrbit {
 }
 
 impl StateVectors<EccAnomaly> for EllipticOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, E: EccAnomaly) -> Self::Position {
         self.r_from_sin_cos_E(E.sin_cos())
     }
@@ -81,6 +82,9 @@ impl StateVectors<EccAnomaly> for EllipticOrbit {
 }
 
 impl StateVectors<TrueAnomaly> for EllipticOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, nu: TrueAnomaly) -> Self::Position {
         self.r_from_sin_cos_E(self.sin_cos_E_from_nu(nu, self.0.e))
     }
@@ -96,6 +100,9 @@ impl StateVectors<TrueAnomaly> for EllipticOrbit {
 }
 
 impl StateVectors<Time> for EllipticOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, t: Time) -> Self::Position {
         self.position(self.0.M_from_t(t))
     }

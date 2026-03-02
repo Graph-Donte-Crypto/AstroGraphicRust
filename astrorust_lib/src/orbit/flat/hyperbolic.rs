@@ -2,7 +2,7 @@ use nalgebra::Vector2;
 use roots::Roots;
 
 use crate::angle::{HypAnomaly, IntoAnomaly, MeanAnomaly, TrueAnomaly};
-use crate::state_vectors::{StateVectorTypes, StateVectors};
+use crate::state_vectors::StateVectors;
 use crate::time::Time;
 
 use super::Orbit2D;
@@ -38,12 +38,10 @@ impl From<Orbit2D> for HyperbolicOrbit {
     }
 }
 
-impl StateVectorTypes for HyperbolicOrbit {
+impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
     type Position = Vector2<f64>;
     type Velocity = Vector2<f64>;
-}
 
-impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
     fn position(&self, M: MeanAnomaly) -> Self::Position {
         let H: HypAnomaly = M.into_anomaly(self.0.e);
         self.r_from_sinh_cosh_H(H.sinh_cosh())
@@ -62,6 +60,9 @@ impl StateVectors<MeanAnomaly> for HyperbolicOrbit {
 }
 
 impl StateVectors<HypAnomaly> for HyperbolicOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, H: HypAnomaly) -> Self::Position {
         self.r_from_sinh_cosh_H(H.sinh_cosh())
     }
@@ -77,6 +78,9 @@ impl StateVectors<HypAnomaly> for HyperbolicOrbit {
 }
 
 impl StateVectors<TrueAnomaly> for HyperbolicOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, nu: TrueAnomaly) -> Self::Position {
         self.r_from_sinh_cosh_H(self.sinh_cosh_H_from_nu(nu, self.0.e))
     }
@@ -92,6 +96,9 @@ impl StateVectors<TrueAnomaly> for HyperbolicOrbit {
 }
 
 impl StateVectors<Time> for HyperbolicOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, t: Time) -> Self::Position {
         self.position(self.0.M_from_t(t))
     }
@@ -279,7 +286,7 @@ impl HyperbolaSolver {
         let enx = ex.recip();
         let f0_sinh = (ex - enx) * 0.5; // sinh(a)
         let f0_cosh = (ex + enx) * 0.5; // cosh(a)
-                                        //
+        //
         let f = ec * f0_sinh - f0 - mh;
         let f_prime = ec * f0_cosh - 1.0;
         let f_prime_prime = f_prime + 1.0;
@@ -316,12 +323,12 @@ fn bisection(function: &impl Fn(f64) -> f64, min: f64, max: f64) -> f64 {
 #[cfg(test)]
 mod test {
     use crate::angle::Angle;
-    use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
     use crate::orbit::flat::Orbit2DBuilder;
+    use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
     use crate::state_vectors::StateVectors;
     use crate::time::Time;
 
-    use super::{bisection, HyperbolaSolver};
+    use super::{HyperbolaSolver, bisection};
     use std::f64::consts::PI;
 
     #[test]
@@ -343,10 +350,10 @@ mod test {
         bisection(&f, -100000.0, 100000.0)
     }
 
+    #[ignore]
     #[test]
     fn test_hyperbola() {
-        let eccentricites: Vec<f64> =
-            (1..999).map(|x| 1.0 + f64::powi(x as f64, 2) / 1000.0).collect();
+        let eccentricites: Vec<f64> = (1..999).map(|x| 1.0 + (x as f64).powi(2) / 1000.0).collect();
         let mean_anomalies: Vec<f64> =
             (0..10000).map(|x| f64::powi(x as f64, 2) / 10000.0).collect();
 

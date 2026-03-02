@@ -3,10 +3,7 @@ pub mod elliptic;
 pub mod hyperbolic;
 pub mod parabolic;
 
-use nalgebra::Vector2;
-
 use crate::angle::{Angle, MeanAnomaly};
-use crate::state_vectors::StateVectorTypes;
 use crate::time::Time;
 
 #[derive(Clone, Builder, CopyGetters, Debug, PartialEq)]
@@ -59,11 +56,6 @@ impl Orbit2DBuilder {
         }
         Ok(())
     }
-}
-
-impl StateVectorTypes for Orbit2D {
-    type Position = Vector2<f64>;
-    type Velocity = Vector2<f64>;
 }
 
 impl Orbit2D {

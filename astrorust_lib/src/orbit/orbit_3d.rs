@@ -2,7 +2,7 @@ use crate::angle::Angle;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::orbit::flat::Orbit2DBuilder;
-use crate::state_vectors::{StateVectorTypes, StateVectors};
+use crate::state_vectors::StateVectors;
 use nalgebra::{Matrix3x2, Vector3};
 use std::f64::consts::TAU;
 use std::ops::Mul;
@@ -184,20 +184,14 @@ impl Orbit3D<HyperbolicOrbit> {
     }
 }
 
-impl<O: StateVectorTypes> StateVectorTypes for Orbit3D<O>
+impl<E: Copy, O: StateVectors<E>> StateVectors<E> for Orbit3D<O>
 where
-    Matrix3x2<f64>: Mul<<O as StateVectorTypes>::Position>,
-    Matrix3x2<f64>: Mul<<O as StateVectorTypes>::Velocity>,
+    Matrix3x2<f64>: Mul<<O as StateVectors<E>>::Position>,
+    Matrix3x2<f64>: Mul<<O as StateVectors<E>>::Velocity>,
 {
     type Position = <Matrix3x2<f64> as Mul<O::Position>>::Output;
     type Velocity = <Matrix3x2<f64> as Mul<O::Velocity>>::Output;
-}
 
-impl<E: Copy, O: StateVectors<E>> StateVectors<E> for Orbit3D<O>
-where
-    Matrix3x2<f64>: Mul<<O as StateVectorTypes>::Position>,
-    Matrix3x2<f64>: Mul<<O as StateVectorTypes>::Velocity>,
-{
     fn position(&self, anomaly: E) -> Self::Position {
         self.orb_to_ecl * self.orbit_2d.position(anomaly)
     }

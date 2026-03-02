@@ -1,19 +1,17 @@
 use nalgebra::Vector2;
 
 use crate::angle::TrueAnomaly;
-use crate::state_vectors::{StateVectorTypes, StateVectors};
+use crate::state_vectors::StateVectors;
 use crate::time::Time;
 
 use super::Orbit2D;
 
 pub struct CircularOrbit(Orbit2D);
 
-impl StateVectorTypes for CircularOrbit {
+impl StateVectors<TrueAnomaly> for CircularOrbit {
     type Position = Vector2<f64>;
     type Velocity = Vector2<f64>;
-}
 
-impl StateVectors<TrueAnomaly> for CircularOrbit {
     fn position(&self, nu: TrueAnomaly) -> Self::Position {
         let (cos_nu, sin_nu) = nu.sin_cos();
         self.0.a * Vector2::new(cos_nu, sin_nu)
@@ -33,6 +31,9 @@ impl StateVectors<TrueAnomaly> for CircularOrbit {
 }
 
 impl StateVectors<Time> for CircularOrbit {
+    type Position = Vector2<f64>;
+    type Velocity = Vector2<f64>;
+
     fn position(&self, t: Time) -> Self::Position {
         self.position(TrueAnomaly::from(*self.0.M_from_t(t)))
     }

@@ -87,17 +87,14 @@ fn pade_initial_guess(e: f64, M: MeanAnomaly) -> EccAnomaly {
 mod tests {
     use crate::angle::{Angle, EccAnomaly, MeanAnomaly};
     use crate::kepler_equation::*;
-    use similar_asserts::assert_eq;
 
     #[test]
     fn highly_elliptic() {
         let e = 0.99999999999;
         let expected_E: EccAnomaly = Angle::from_rad(0.0843533).into();
         let M: MeanAnomaly = Angle::from_rad(expected_E.as_rad() - e * expected_E.sin()).into();
-        let newton_E = solve_kepler_newton_pade(e, M);
         let householder_E = solve_kepler_householder_pade_elliptic(e, M);
-        assert_eq!(newton_E.as_rad(), householder_E.as_rad());
-        //assert_eq!(householder_E.as_rad(), expected_E.as_rad());
+        assert!((householder_E.as_rad() - expected_E.as_rad()).abs() < 1e-13);
     }
 
     #[test]
