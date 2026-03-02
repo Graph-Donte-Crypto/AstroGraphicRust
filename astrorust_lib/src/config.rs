@@ -46,7 +46,7 @@ pub struct Planet {
 
 impl Planet {
     pub fn soi_radius(&self) -> f64 {
-        self.orbit.a * (self.body.μ / self.orbit.mu).powf(0.4)
+        self.orbit.a * (self.body.μ / (self.orbit.mu - self.body.μ)).powf(0.4)
     }
 }
 
@@ -80,19 +80,18 @@ impl StarSystem {
     pub fn load_from_yaml(path: &str) -> anyhow::Result<Self> {
         let mut system: Self = serde_saphyr::from_str(&std::fs::read_to_string(path)?)?;
         for planet in &mut system.planets {
-            planet.orbit.mu = system.star.μ;
+            planet.orbit.mu = system.star.μ + planet.body.μ;
             for moon in &mut planet.moons {
-                moon.orbit.mu = planet.body.μ;
+                moon.orbit.mu = planet.body.μ + moon.body.μ;
             }
         }
         Ok(system)
     }
 
     pub fn into_planets(self) -> Vec<(CelestialBody, Orbit3D<EllipticOrbit>)> {
-        let μ = self.star.μ;
         self.planets
             .into_iter()
-            .map(|planet| (planet.body, build_orbit(μ, &planet.orbit)))
+            .map(|planet| (planet.body, KeplerianElements::from(planet.orbit).into()))
             .collect()
     }
 }
@@ -118,10 +117,4 @@ where
     let b = u8::from_str_radix(&color[5..7], 16)
         .map_err(|_| serde::de::Error::custom("invalid blue channel in color"))?;
     Ok([r, g, b])
-}
-
-fn build_orbit(mu: f64, orbit: &Orbit) -> Orbit3D<EllipticOrbit> {
-    let mut orbit = orbit.clone();
-    orbit.mu = mu;
-    Orbit3D::<EllipticOrbit>::from(KeplerianElements::from(orbit))
 }

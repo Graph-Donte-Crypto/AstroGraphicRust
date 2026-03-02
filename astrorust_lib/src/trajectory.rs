@@ -98,10 +98,11 @@ impl From<config::Orbit> for Trajectory {
 
 impl Display for Orbit3D<EllipticOrbit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let a = self.orbit_2d.0.a();
+        let (a, a_unit) = if a / AU_IN_KM < 0.2 { (a, "km") } else { (a / AU_IN_KM, "au") };
         write!(
             f,
-            "a: {:.6} AU\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
-            self.orbit_2d.0.a() / AU_IN_KM,
+            "a: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
             self.orbit_2d.0.e(),
             self.i().to_degrees(),
             self.Omega().to_degrees(),
@@ -113,10 +114,12 @@ impl Display for Orbit3D<EllipticOrbit> {
 
 impl Display for Orbit3D<HyperbolicOrbit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let a = self.orbit_2d.0.a();
+        let (a, a_unit) = if (a / AU_IN_KM).abs() < 0.2 { (a, "km") } else { (a / AU_IN_KM, "au") };
         write!(
             f,
-            "a: {:.6} AU\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
-            self.orbit_2d.0.a() / AU_IN_KM,
+            "pe: {:.0} km\n a: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            a * (1.0 - self.orbit_2d.0.e()),
             self.orbit_2d.0.e(),
             self.i().to_degrees(),
             self.Omega().to_degrees(),

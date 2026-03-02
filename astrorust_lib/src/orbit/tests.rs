@@ -21,11 +21,11 @@ fn jupiter_at_time_of_voyager_2_flyby_periapsis() {
     let computed = orbit.position_and_velocity(t);
     eprintln!(
         "Relative error for r, %: {}",
-        (computed.0.component_div(&expected.0) - Vector3::new(1.0, 1.0, 1.0)) * 100.0
+        ((computed.0 - expected.0).magnitude() / expected.0.magnitude()) * 100.0
     );
     eprintln!(
         "Relative error for v, %: {}",
-        (computed.1.component_div(&expected.1) - Vector3::new(1.0, 1.0, 1.0)) * 100.0
+        ((computed.1 - expected.1).magnitude() / expected.1.magnitude()) * 100.0
     );
     assert_eq!(computed, expected);
 }
@@ -45,11 +45,11 @@ fn jupiter_at_j2000() {
     let computed = orbit.position_and_velocity(t);
     eprintln!(
         "Relative error for r, %: {}",
-        (computed.0.component_div(&expected.0) - Vector3::new(1.0, 1.0, 1.0)) * 100.0
+        ((computed.0 - expected.0).magnitude() / expected.0.magnitude()) * 100.0
     );
     eprintln!(
         "Relative error for v, %: {}",
-        (computed.1.component_div(&expected.1) - Vector3::new(1.0, 1.0, 1.0)) * 100.0
+        ((computed.1 - expected.1).magnitude() / expected.1.magnitude()) * 100.0
     );
     assert_eq!(computed, expected);
 }
