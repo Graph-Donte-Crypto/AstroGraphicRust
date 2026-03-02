@@ -98,7 +98,22 @@ impl StarSystem {
 
 impl Config {
     pub fn load_from_yaml(path: &str) -> anyhow::Result<Self> {
-        Ok(serde_saphyr::from_str(&std::fs::read_to_string(path)?)?)
+        let mut config: Self = serde_saphyr::from_str(&std::fs::read_to_string(path)?)?;
+        let system_path = std::path::Path::new(path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("system")
+            .join(format!("{}.yml", config.system.to_lowercase()));
+        let system = StarSystem::load_from_yaml(system_path.to_str().unwrap())?;
+        config.spacecraft.orbit.mu = std::iter::once((system.star.name.as_str(), system.star.μ))
+            .chain(system.planets.iter().map(|planet| (planet.body.name.as_str(), planet.body.μ)))
+            .chain(system.planets.iter().flat_map(|planet| {
+                planet.moons.iter().map(|moon| (moon.body.name.as_str(), moon.body.μ))
+            }))
+            .find(|(name, _)| *name == config.spacecraft.body)
+            .ok_or_else(|| anyhow::anyhow!("Body `{}` not found", config.spacecraft.body))?
+            .1;
+        Ok(config)
     }
 }
 

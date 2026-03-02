@@ -17,6 +17,7 @@ use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
 use na::{Point3, Translation3, Vector3};
+use std::f64::consts::TAU;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
@@ -88,24 +89,19 @@ fn main() {
 
     let planets_epoch = system.t0;
     let started_at_date =
-        chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
+        chrono::DateTime::parse_from_rfc3339("1979-04-15T00:00:00Z").unwrap().to_utc();
+        // chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
     let started_at = Instant::now();
     let mut previous_frame = Instant::now();
     let mut simulated_seconds = (started_at_date - planets_epoch).as_seconds_f64();
     let mut time_warp_index = DEFAULT_TIME_WARP_INDEX;
 
-    let (_, spacecraft_μ) = std::iter::once((system.star.name.as_str(), system.star.μ))
-        .chain(system.planets.iter().map(|planet| (planet.body.name.as_str(), planet.body.μ)))
-        .chain(system.planets.iter().flat_map(|planet| {
-            planet.moons.iter().map(|moon| (moon.body.name.as_str(), moon.body.μ))
-        }))
-        .find(|(name, _)| *name == config.spacecraft.body)
-        .expect(&format!("Body `{}` not found", config.spacecraft.body));
-    config.spacecraft.orbit.M0 -= (config.spacecraft.t0 - system.t0).as_seconds_f64()
-        * (spacecraft_μ / config.spacecraft.orbit.a.powi(3)).sqrt();
-    let mut spacecraft_orbit = config.spacecraft.orbit.clone();
-    spacecraft_orbit.mu = spacecraft_μ;
-    let spacecraft: Trajectory = spacecraft_orbit.into();
+    config.spacecraft.orbit.M0 = (config.spacecraft.orbit.M0
+        + ((system.t0 - config.spacecraft.t0).as_seconds_f64()
+            * (config.spacecraft.orbit.mu / config.spacecraft.orbit.a.powi(3)).sqrt())
+            % TAU)
+        % TAU;
+    let spacecraft: Trajectory = config.spacecraft.orbit.clone().into();
     let mut spacecraft =
         create_spacecraft(&mut window, scale, spacecraft, Point3::new(1.0, 1.0, 1.0), None);
 
@@ -289,10 +285,10 @@ fn draw_orbit_and_current_position_of_spacecraft(
     spacecraft.node.set_local_scale(scale, scale, scale);
 
     let telemetry_text = format!(
-        "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} au\nSpeed: {speed:.1} km/s",
+        "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} km\nSpeed: {speed:.1} km/s",
         warp = format_signed_warp(time_warp),
         time = (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
-        distance = r.magnitude() / 149597870.700,
+        distance = r,
         speed = v.magnitude(),
     );
     let orbit_text = format!(
@@ -310,7 +306,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     );
     window.draw_text(
         &orbit_text,
-        &Point2::new(0.0, text_scale * 5.0),
+        &Point2::new(0.0, text_scale * 10.0),
         text_scale,
         hud_font,
         &Point3::new(1.0, 1.0, 1.0),

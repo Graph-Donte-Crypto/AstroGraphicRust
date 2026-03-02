@@ -4,7 +4,7 @@ use std::ops::{Add, Deref, Sub};
 use crate::kepler_equation;
 use crate::util::FloatExt;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Angle(f64);
 
 impl Angle {
@@ -128,7 +128,7 @@ impl Deref for TrueAnomaly {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct MeanAnomaly(Angle);
 
 impl From<Angle> for MeanAnomaly {

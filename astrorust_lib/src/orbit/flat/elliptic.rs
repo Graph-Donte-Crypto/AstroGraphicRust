@@ -7,7 +7,7 @@ use crate::time::Time;
 use super::Orbit2D;
 use std::f64::consts::TAU;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EllipticOrbit(pub Orbit2D);
 
 impl From<Orbit2D> for EllipticOrbit {

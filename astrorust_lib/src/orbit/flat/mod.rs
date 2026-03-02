@@ -9,7 +9,7 @@ use crate::angle::{Angle, MeanAnomaly};
 use crate::state_vectors::StateVectorTypes;
 use crate::time::Time;
 
-#[derive(Clone, Builder, CopyGetters, Debug)]
+#[derive(Clone, Builder, CopyGetters, Debug, PartialEq)]
 #[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit2D {
     /// Standard gravitational parameter

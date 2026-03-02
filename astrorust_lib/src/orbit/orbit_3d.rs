@@ -7,7 +7,7 @@ use nalgebra::{Matrix3x2, Vector3};
 use std::f64::consts::TAU;
 use std::ops::Mul;
 
-#[derive(Builder, CopyGetters, Debug, Clone)]
+#[derive(Builder, CopyGetters, Debug, Clone, PartialEq)]
 // #[builder(build_fn(validate = "Self::validate"))]
 pub struct Orbit3D<O> {
     #[builder(setter)]

@@ -12,12 +12,23 @@ spacecraft:
     # M0: 1.65
     #
     # Voyager 2 from https://science.nasa.gov/mission/voyager/planetary-voyage/#hyperbolic
-    a: 544.47e6
-    e: 0.724429
-    i: 4.825717
-    Ω: -32.940520
-    ω: 11.702680
-    M0: 6.2676797497
+    # a: 544.47e6
+    # e: 0.724429
+    # i: 4.825717
+    # Ω: -32.940520
+    # ω: 11.702680
+    # M0: 6.26898
+
+
+    # Voayager 2 from Horizon state vectors just before Jupiter arrival
+    a: 546065282.4529687
+    e: 0.7331215656362654
+    i: 5.0283364043
+    Ω: -32.9834163461
+    ω: 12.2919523634
+    M0: 6.2506
+
+    #M0: 6.2676797497
     #
     # Voyager 2 jupiter to saturn
     # a: -2220315000
