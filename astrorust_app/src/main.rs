@@ -129,82 +129,64 @@ fn main() {
         simulated_seconds += real_dt * time_warp as f64;
         let t = Time::from_secs(simulated_seconds);
         for planet in &mut planets {
-            draw_orbit_and_current_position(&mut window, &eye, scale, planet, t);
+            planet.r = planet.orbit.position(t);
+            draw_orbit_and_current_position(&mut window, &eye, scale, planet);
         }
 
-        let r = spacecraft.trajectory.position(t);
+        {
+            let (r, v) = spacecraft.trajectory.position_and_velocity(t);
+            spacecraft.r = r;
+            spacecraft.v = v;
+        }
         if spacecraft.planet_idx.is_none()
             && let Some((i, planet)) = planets
                 .iter()
                 .enumerate()
-                .find(|(_, planet)| (planet.orbit.position(t) - r).magnitude() <= planet.soi_radius)
+                .find(|(_, planet)| (planet.r - spacecraft.r).magnitude() <= planet.soi_radius)
         {
             eprintln!("Spacecraft entering SOI of planet {}", planet.body.name);
-            let (planet_r, planet_v) = planet.orbit.position_and_velocity(t);
+            let planet_v = planet.orbit.velocity(t);
 
             // Convert heliocentric state vectors to planetocentric
-            let r = r - planet_r;
-            let v = spacecraft.trajectory.velocity(t) - planet_v;
-            dbg!(&r, &v, r.magnitude(), planet.soi_radius);
+            spacecraft.r -= planet.r;
+            spacecraft.v -= planet_v;
 
             spacecraft.planet_idx = Some(i);
             // Calculate flyby hyperbola from new state vectors
-            spacecraft.trajectory =
-                Trajectory::from_state_vectors(planet.body.μ, r, v, t.as_secs());
+            spacecraft.trajectory = Trajectory::from_state_vectors(
+                planet.body.μ,
+                spacecraft.r,
+                spacecraft.v,
+                t.as_secs(),
+            );
             spacecraft.points =
                 gui_lib::generate_trajectory_points(planet.soi_radius, &spacecraft.trajectory, 100)
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
         } else if let Some(planet) = spacecraft.planet_idx.map(|i| &planets[i])
-            && spacecraft.trajectory.position(t).magnitude() > planet.soi_radius
+            && spacecraft.r.magnitude() > planet.soi_radius
         {
             eprintln!("Spacecraft leaving SOI of planet {}", planet.body.name);
-            let (planet_r, planet_v) = planet.orbit.position_and_velocity(t);
+            let planet_v = planet.orbit.velocity(t);
 
             // Convert planetocentric state vectors to heliocentric
-            let r = r + planet_r;
-            let v = spacecraft.trajectory.velocity(t) + planet_v;
+            spacecraft.r += planet.r;
+            spacecraft.v += planet_v;
 
             spacecraft.planet_idx = None;
             // Calculate trajectory around the Sun from new state vectors
-            spacecraft.trajectory =
-                Trajectory::from_state_vectors(system.star.μ, r, v, t.as_secs());
+            spacecraft.trajectory = Trajectory::from_state_vectors(
+                system.star.μ,
+                spacecraft.r,
+                spacecraft.v,
+                t.as_secs(),
+            );
             spacecraft.points =
                 gui_lib::generate_trajectory_points(1e11, &spacecraft.trajectory, 360)
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
-
-            // // Unit vector from planet to periapsis of flyby hyperbola
-            // let unit_e = (v.cross(&r.cross(&v)) / body.μ - r.normalize()).normalize();
-            //
-            // dbg!("Flyby start: ", &r, &v);
-            //
-            // // Reflect state vectors to get state vectors after the flyby
-            // r = -r + 2.0 * r.dot(&unit_e) * unit_e;
-            // let delta_v = 2.0 * v.dot(&unit_e) * unit_e;
-            // v += delta_v;
-            //
-            // dbg!("Flyby end: ", &r, &v, &delta_v, delta_v.magnitude());
-            //
-            // r = (orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4)) * r.normalize();
-            //
-            // // Convert planetocentric state vectors back to heliocentric
-            // r += planet_r;
-            // v += planet_v;
-            // dbg!(r.magnitude(), v.magnitude());
-            //
-            // // Calculate new orbit from new state vectors
-            // let new_orbit = Trajectory::from_state_vectors(system.star.μ, r, v, t.as_secs());
-            // dbg!(&spacecraft.trajectory, &new_orbit);
-            // spacecraft.trajectory = new_orbit.into();
-            // // let soi_radius = orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4);
-            // spacecraft.points =
-            //     gui_lib::generate_trajectory_points(1e11, &spacecraft.trajectory, 360)
-            //         .iter()
-            //         .map(|point| point.map(|x| (scale * x) as f32))
-            //         .collect();
         };
         draw_orbit_and_current_position_of_spacecraft(
             &mut window,
@@ -234,13 +216,11 @@ fn draw_orbit_and_current_position(
     eye: &Point3<f32>,
     scale: f64,
     body: &mut Body,
-    t: Time,
 ) {
     gui_lib::draw_orbit_points(window, &body.points, &body.color, false);
-    let r = body.orbit.position(t);
 
-    body.sphere.set_local_translation(Translation3 { vector: r.map(|x| (scale * x) as f32) });
-    let clamp = (20.0, (50.0 * body.orbit.orbit_2d.0.a().max(149.6 * 1e6) / 90118820.0) as f32);
+    body.sphere.set_local_translation(Translation3 { vector: body.r.map(|x| (scale * x) as f32) });
+    let clamp = (20.0, (50.0 * body.orbit.orbit_2d.0.a().max(AU_IN_KM) / 90118820.0) as f32);
     let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
     body.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 }
@@ -260,17 +240,16 @@ fn draw_orbit_and_current_position_of_spacecraft(
         Trajectory::Elliptic(_) => false,
         Trajectory::Hyperbolic(_) => true,
     };
-    let (r, v) = spacecraft.trajectory.position_and_velocity(t);
     let heliocentric_r = if let Some(i) = spacecraft.planet_idx {
-        let planet_r = planets[i].orbit.position(t);
+        let planet_r = planets[i].r;
 
         let points: Vec<_> =
             spacecraft.points.iter().map(|p| p + (scale * planet_r).map(|x| x as f32)).collect();
         gui_lib::draw_orbit_points(window, &points, &spacecraft.color, is_hyperbolic);
-        r + planet_r
+        spacecraft.r + planet_r
     } else {
         gui_lib::draw_orbit_points(window, &spacecraft.points, &spacecraft.color, is_hyperbolic);
-        r
+        spacecraft.r
     };
 
     spacecraft
@@ -278,23 +257,23 @@ fn draw_orbit_and_current_position_of_spacecraft(
         .set_local_translation(Translation3 { vector: heliocentric_r.map(|x| (scale * x) as f32) });
     spacecraft.node.set_local_rotation(UnitQuaternion::face_towards(
         &-Vector3::z(),
-        &(planets[2].orbit.position(t) - heliocentric_r).normalize().map(|x| x as f32),
+        &(planets[2].r - heliocentric_r).normalize().map(|x| x as f32),
     ));
     let clamp =
-        (200.0, (700.0 * spacecraft.trajectory.a().abs().max(149.6 * 1e6) / 90118820.0) as f32);
+        (200.0, (700.0 * spacecraft.trajectory.a().abs().max(AU_IN_KM) / 90118820.0) as f32);
     let scale = (eye.coords.magnitude() * 0.3).clamp(clamp.0, clamp.1);
     spacecraft.node.set_local_scale(scale, scale, scale);
 
-    let (distance, distance_unit) = if r.magnitude() < (AU_IN_KM * 0.2) {
-        (r.magnitude(), "km")
+    let (distance, distance_unit) = if spacecraft.r.magnitude() < (AU_IN_KM * 0.2) {
+        (spacecraft.r.magnitude(), "km")
     } else {
-        (r.magnitude() / AU_IN_KM, "au")
+        (spacecraft.r.magnitude() / AU_IN_KM, "au")
     };
     let telemetry_text = format!(
         "Warp: {warp}x\nTime: {time}\nDistance: {distance:.2} {distance_unit}\nSpeed: {speed:.1} km/s",
         warp = format_signed_warp(time_warp),
         time = (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
-        speed = v.magnitude(),
+        speed = spacecraft.v.magnitude(),
     );
     let orbit_text = format!(
         "SOI: {soi}\n{orbit}",
@@ -346,8 +325,9 @@ fn create_body(
     let mut sphere = window.add_sphere(PLANET_RADIUS as f32);
     sphere.set_color(color.x, color.y, color.z);
     let soi_radius = orbit.orbit_2d.0.a() * (body.μ / orbit.orbit_2d.0.mu()).powf(0.4);
+    let r = orbit.position(Time::from_secs(0.0));
 
-    Body { sphere, body, orbit, points, color, soi_radius }
+    Body { sphere, body, orbit, points, color, soi_radius, r }
 }
 
 fn create_spacecraft(
@@ -365,8 +345,9 @@ fn create_spacecraft(
     let mtl_dir = Path::new("models");
     let obj_path = Path::new("models/voyager.obj");
     let node = window.add_obj(obj_path, mtl_dir, Vector3::new(1.0, 1.0, 1.0));
+    let (r, v) = trajectory.position_and_velocity(Time::from_secs(0.0));
 
-    Spacecraft { node, trajectory, points, color, planet_idx }
+    Spacecraft { node, trajectory, points, color, planet_idx, r, v }
 }
 
 fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
@@ -380,6 +361,7 @@ struct Body {
     points: Vec<Point3<f32>>,
     color: Point3<f32>,
     soi_radius: f64,
+    r: Vector3<f64>,
 }
 
 struct Spacecraft {
@@ -388,4 +370,6 @@ struct Spacecraft {
     trajectory: Trajectory,
     points: Vec<Point3<f32>>,
     color: Point3<f32>,
+    r: Vector3<f64>,
+    v: Vector3<f64>,
 }
