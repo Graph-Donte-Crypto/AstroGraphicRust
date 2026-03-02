@@ -4,6 +4,7 @@ use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::UnitQuaternion;
+use astrorust_lib::AU_IN_KM;
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
@@ -90,7 +91,7 @@ fn main() {
     let planets_epoch = system.t0;
     let started_at_date =
         chrono::DateTime::parse_from_rfc3339("1979-04-15T00:00:00Z").unwrap().to_utc();
-        // chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
+    // chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
     let started_at = Instant::now();
     let mut previous_frame = Instant::now();
     let mut simulated_seconds = (started_at_date - planets_epoch).as_seconds_f64();
@@ -284,11 +285,15 @@ fn draw_orbit_and_current_position_of_spacecraft(
     let scale = (eye.coords.magnitude() * 0.3).clamp(clamp.0, clamp.1);
     spacecraft.node.set_local_scale(scale, scale, scale);
 
+    let (distance, distance_unit) = if r.magnitude() < (AU_IN_KM * 0.2) {
+        (r.magnitude(), "km")
+    } else {
+        (r.magnitude() / AU_IN_KM, "au")
+    };
     let telemetry_text = format!(
-        "Warp: {warp}x\nTime: {time}\nDistance: {distance:.1} km\nSpeed: {speed:.1} km/s",
+        "Warp: {warp}x\nTime: {time}\nDistance: {distance:.2} {distance_unit}\nSpeed: {speed:.1} km/s",
         warp = format_signed_warp(time_warp),
         time = (epoch + Duration::from(t)).format("%Y-%m-%d %H:%M"),
-        distance = r,
         speed = v.magnitude(),
     );
     let orbit_text = format!(
@@ -306,7 +311,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     );
     window.draw_text(
         &orbit_text,
-        &Point2::new(0.0, text_scale * 10.0),
+        &Point2::new(0.0, text_scale * 5.0),
         text_scale,
         hud_font,
         &Point3::new(1.0, 1.0, 1.0),

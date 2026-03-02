@@ -1,4 +1,4 @@
-use crate::config;
+use crate::{config, AU_IN_KM};
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
@@ -6,8 +6,6 @@ use crate::state_vectors::StateVectors;
 use nalgebra::{Matrix3x2, Vector3};
 use std::ops::Mul;
 use std::fmt::{self, Display, Formatter};
-
-const AU_IN_KM: f64 = 149_597_870.700;
 
 #[derive(Debug, Clone)]
 pub enum Trajectory {
