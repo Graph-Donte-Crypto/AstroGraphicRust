@@ -1,7 +1,5 @@
-pub mod circular;
 pub mod elliptic;
 pub mod hyperbolic;
-pub mod parabolic;
 
 use crate::angle::{Angle, MeanAnomaly};
 use crate::time::Time;

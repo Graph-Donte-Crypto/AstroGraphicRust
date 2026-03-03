@@ -3,7 +3,7 @@
 - [x] New methods `Orbit3D::from_state_vectors(mu, r, v) -> Orbit3D` and same for `Trajectory`
 - [x] Display time warp using `.draw_text`
 - [x] Time warp controls on `[` and `]` keys like in KSP
-- [ ] Spacecraft should be able to orbit planets, not just the Sun (to correctly simulate Jupiter gravity assists, as spacecraft spends quite a lot of time in its sphere of influence)
+- [x] Spacecraft should be able to orbit planets, not just the Sun (to correctly simulate Jupiter gravity assists, as spacecraft spends quite a lot of time in its sphere of influence)
 - [ ] Avoid skipping planet SOI on high time warps. 
   - If spacecraft is currently in Sun SOI:
     1. Analytically compute exact SOI entrance and exit times. At each simulation frame:
