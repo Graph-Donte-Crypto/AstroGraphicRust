@@ -103,7 +103,9 @@ impl Display for Orbit3D<EllipticOrbit> {
         let (a, a_unit) = if a / AU_IN_KM < 0.2 { (a, "km") } else { (a / AU_IN_KM, "au") };
         write!(
             f,
-            "a: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            "pe: {:.6} {a_unit}\nap: {:.6} {a_unit}\na: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            a * (1.0 - self.orbit_2d.0.e()),
+            a * (1.0 + self.orbit_2d.0.e()),
             self.orbit_2d.0.e(),
             self.i().to_degrees(),
             self.Omega().to_degrees(),
@@ -119,13 +121,13 @@ impl Display for Orbit3D<HyperbolicOrbit> {
         let (a, a_unit) = if (a / AU_IN_KM).abs() < 0.2 { (a, "km") } else { (a / AU_IN_KM, "au") };
         write!(
             f,
-            "pe: {:.0} km\n a: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}°",
+            "pe: {:.6} {a_unit}\n a: {a:.6} {a_unit}\ne: {:.6}\ni: {:.3}°\n\u{03A9}: {:.3}°\n\u{03C9}: {:.3}°\nM₀: {:.3}",
             a * (1.0 - self.orbit_2d.0.e()),
             self.orbit_2d.0.e(),
             self.i().to_degrees(),
             self.Omega().to_degrees(),
             self.omega().to_degrees(),
-            self.orbit_2d.0.M0().as_deg(),
+            self.orbit_2d.0.M0().as_rad(),
         )
     }
 }

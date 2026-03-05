@@ -103,8 +103,13 @@ fn main() {
             % TAU)
         % TAU;
     let spacecraft: Trajectory = config.spacecraft.orbit.clone().into();
-    let mut spacecraft =
-        create_spacecraft(&mut window, scale, spacecraft, Point3::new(1.0, 1.0, 1.0), None);
+    let mut spacecraft = create_spacecraft(
+        &mut window,
+        scale,
+        spacecraft,
+        rgb8_to_color(config.spacecraft.color),
+        None,
+    );
 
     while window.render_with_camera(&mut camera) {
         for event in window.events().iter() {
@@ -219,9 +224,10 @@ fn draw_orbit_and_current_position(
 ) {
     gui_lib::draw_orbit_points(window, &body.points, &body.color, false);
 
-    body.sphere.set_local_translation(Translation3 { vector: body.r.map(|x| (scale * x) as f32) });
-    let clamp = (20.0, (50.0 * body.orbit.orbit_2d.0.a().max(AU_IN_KM) / 90118820.0) as f32);
-    let planet_scale = (eye.coords.magnitude() * 0.020).clamp(clamp.0, clamp.1);
+    let body_scaled_position = body.r.map(|x| (scale * x) as f32);
+    body.sphere.set_local_translation(Translation3 { vector: body_scaled_position });
+    //let clamp = (0.01, (50.0 * body.orbit.orbit_2d.0.a().max(AU_IN_KM) / 90118820.0) as f32);
+    let planet_scale = (eye.coords - body_scaled_position).magnitude() * 0.02;
     body.sphere.set_local_scale(planet_scale, planet_scale, planet_scale);
 }
 
@@ -252,16 +258,13 @@ fn draw_orbit_and_current_position_of_spacecraft(
         spacecraft.r
     };
 
-    spacecraft
-        .node
-        .set_local_translation(Translation3 { vector: heliocentric_r.map(|x| (scale * x) as f32) });
+    let scaled_position = heliocentric_r.map(|x| (scale * x) as f32);
+    spacecraft.node.set_local_translation(Translation3 { vector: scaled_position });
     spacecraft.node.set_local_rotation(UnitQuaternion::face_towards(
         &-Vector3::z(),
         &(planets[2].r - heliocentric_r).normalize().map(|x| x as f32),
     ));
-    let clamp =
-        (200.0, (700.0 * spacecraft.trajectory.a().abs().max(AU_IN_KM) / 90118820.0) as f32);
-    let scale = (eye.coords.magnitude() * 0.3).clamp(clamp.0, clamp.1);
+    let scale = (eye.coords - scaled_position).magnitude() * 0.2;
     spacecraft.node.set_local_scale(scale, scale, scale);
 
     let (distance, distance_unit) = if spacecraft.r.magnitude() < (AU_IN_KM * 0.2) {
@@ -316,7 +319,7 @@ fn create_body(
     body: CelestialBody,
     orbit: Orbit3D<EllipticOrbit>,
 ) -> Body {
-    let points = gui_lib::generate_ellipse_points(&orbit, 100)
+    let points = gui_lib::generate_ellipse_points(&orbit, 360)
         .iter()
         .map(|point| point.map(|x| (scale * x) as f32))
         .collect();

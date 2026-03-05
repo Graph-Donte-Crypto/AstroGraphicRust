@@ -13,6 +13,8 @@ pub struct Config {
 pub struct Spacecraft {
     pub t0: DateTime<Utc>,
     pub body: String,
+    #[serde(deserialize_with = "deserialize_hex_color")]
+    pub color: [u8; 3],
     pub orbit: Orbit,
 }
 

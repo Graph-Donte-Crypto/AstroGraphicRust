@@ -1,6 +1,7 @@
 system: solar
 spacecraft:
   t0: 1977-08-23T11:29:11Z
+  color: "#2b7e87"
   body: Sun
   orbit:
     # Some hyperbola
