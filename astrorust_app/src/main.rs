@@ -6,6 +6,7 @@ use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::UnitQuaternion;
 use astrorust_lib::AU_IN_KM;
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
+use astrorust_lib::encounter::is_encounter_possible;
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
@@ -110,6 +111,15 @@ fn main() {
         rgb8_to_color(config.spacecraft.color),
         None,
     );
+    spacecraft.encounters = planets
+        .iter()
+        .enumerate()
+        .filter(|(_, planet)| {
+            is_encounter_possible(&spacecraft.trajectory, &planet.orbit, planet.soi_radius)
+        })
+        .map(|(i, _)| i)
+        .collect();
+    dbg!(&spacecraft.encounters);
 
     while window.render_with_camera(&mut camera) {
         for event in window.events().iter() {
@@ -144,9 +154,10 @@ fn main() {
             spacecraft.v = v;
         }
         if spacecraft.planet_idx.is_none()
-            && let Some((i, planet)) = planets
+            && let Some((i, planet)) = spacecraft
+                .encounters
                 .iter()
-                .enumerate()
+                .map(|&i| (i, &planets[i]))
                 .find(|(_, planet)| (planet.r - spacecraft.r).magnitude() <= planet.soi_radius)
         {
             eprintln!("Spacecraft entering SOI of planet {}", planet.body.name);
@@ -192,6 +203,15 @@ fn main() {
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
+            spacecraft.encounters = planets
+                .iter()
+                .enumerate()
+                .filter(|(_, planet)| {
+                    is_encounter_possible(&spacecraft.trajectory, &planet.orbit, planet.soi_radius)
+                })
+                .map(|(i, _)| i)
+                .collect();
+            dbg!(&spacecraft.encounters);
         };
         draw_orbit_and_current_position_of_spacecraft(
             &mut window,
@@ -350,7 +370,7 @@ fn create_spacecraft(
     let node = window.add_obj(obj_path, mtl_dir, Vector3::new(1.0, 1.0, 1.0));
     let (r, v) = trajectory.position_and_velocity(Time::from_secs(0.0));
 
-    Spacecraft { node, trajectory, points, color, planet_idx, r, v }
+    Spacecraft { node, trajectory, points, color, planet_idx, encounters: vec![], r, v }
 }
 
 fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
@@ -371,6 +391,7 @@ struct Spacecraft {
     node: SceneNode,
     planet_idx: Option<usize>,
     trajectory: Trajectory,
+    encounters: Vec<usize>,
     points: Vec<Point3<f32>>,
     color: Point3<f32>,
     r: Vector3<f64>,

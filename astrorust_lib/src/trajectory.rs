@@ -21,6 +21,13 @@ impl Trajectory {
         }
     }
 
+    pub fn e(&self) -> f64 {
+        match self {
+            Trajectory::Elliptic(orbit3_d) => orbit3_d.orbit_2d.0.e(),
+            Trajectory::Hyperbolic(orbit3_d) => orbit3_d.orbit_2d.0.e(),
+        }
+    }
+
     pub fn t0(&self) -> f64 {
         match self {
             Trajectory::Elliptic(orbit3_d) => orbit3_d.orbit_2d.0.a(),

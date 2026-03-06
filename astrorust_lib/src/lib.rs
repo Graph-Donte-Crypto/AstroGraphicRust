@@ -15,6 +15,7 @@ pub mod state_vectors;
 pub mod time;
 pub mod trajectory;
 pub mod util;
+pub mod encounter;
 
 
 pub const AU_IN_KM: f64 = 149_597_870.700;
