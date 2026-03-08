@@ -1,7 +1,7 @@
 use crate::angle::Angle;
+use crate::orbit::flat::Orbit2DBuilder;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
-use crate::orbit::flat::Orbit2DBuilder;
 use crate::state_vectors::StateVectors;
 use nalgebra::{Matrix3x2, Vector3};
 use std::f64::consts::TAU;
@@ -36,9 +36,47 @@ pub struct Orbit3D<O> {
     orb_to_ecl: Matrix3x2<f64>,
 }
 
+impl Orbit3D<EllipticOrbit> {
+    pub fn periapsis(&self) -> f64 {
+        self.orbit_2d.periapsis()
+    }
+
+    pub fn apoapsis(&self) -> f64 {
+        self.orbit_2d.apoapsis()
+    }
+
+    pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
+        Self::from(elements_from_state_vectors(mu, r, v, t))
+    }
+}
+
+impl Orbit3D<HyperbolicOrbit> {
+    pub fn periapsis(&self) -> f64 {
+        self.orbit_2d.periapsis()
+    }
+
+    pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
+        Self::from(elements_from_state_vectors(mu, r, v, t))
+    }
+}
+
 impl<O> Orbit3D<O> {
     pub fn orb_to_ecl(&self) -> &Matrix3x2<f64> {
         &self.orb_to_ecl
+    }
+
+    fn compute_orb_to_ecl(i: f64, Omega: f64, omega: f64) -> Matrix3x2<f64> {
+        let (sin_i, cos_i) = i.sin_cos();
+        let (sin_Omega, cos_Omega) = Omega.sin_cos();
+        let (sin_omega, cos_omega) = omega.sin_cos();
+        Matrix3x2::new(
+            cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
+            -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i,
+            sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
+            -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i,
+            sin_omega * sin_i,
+            cos_omega * sin_i,
+        )
     }
 }
 
@@ -172,18 +210,6 @@ impl From<KeplerianElements> for Orbit3D<HyperbolicOrbit> {
     }
 }
 
-impl Orbit3D<EllipticOrbit> {
-    pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
-        Self::from(elements_from_state_vectors(mu, r, v, t))
-    }
-}
-
-impl Orbit3D<HyperbolicOrbit> {
-    pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {
-        Self::from(elements_from_state_vectors(mu, r, v, t))
-    }
-}
-
 impl<E: Copy, O: StateVectors<E>> StateVectors<E> for Orbit3D<O>
 where
     Matrix3x2<f64>: Mul<<O as StateVectors<E>>::Position>,
@@ -203,21 +229,5 @@ where
     fn position_and_velocity(&self, anomaly: E) -> (Self::Position, Self::Velocity) {
         let (r, v) = self.orbit_2d.position_and_velocity(anomaly);
         (self.orb_to_ecl * r, self.orb_to_ecl * v)
-    }
-}
-
-impl<O> Orbit3D<O> {
-    fn compute_orb_to_ecl(i: f64, Omega: f64, omega: f64) -> Matrix3x2<f64> {
-        let (sin_i, cos_i) = i.sin_cos();
-        let (sin_Omega, cos_Omega) = Omega.sin_cos();
-        let (sin_omega, cos_omega) = omega.sin_cos();
-        Matrix3x2::new(
-            cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i,
-            -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i,
-            sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i,
-            -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i,
-            sin_omega * sin_i,
-            cos_omega * sin_i,
-        )
     }
 }

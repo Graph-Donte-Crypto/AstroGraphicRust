@@ -40,6 +40,14 @@ impl EllipticOrbit {
     pub fn period(&self) -> Time {
         Time::from_secs(TAU / self.0.mean_motion)
     }
+
+    pub fn periapsis(&self) -> f64 {
+        self.0.periapsis()
+    }
+
+    pub fn apoapsis(&self) -> f64 {
+        self.0.apoapsis()
+    }
 }
 
 impl StateVectors<MeanAnomaly> for EllipticOrbit {
@@ -119,8 +127,8 @@ impl StateVectors<Time> for EllipticOrbit {
 #[cfg(test)]
 mod tests {
     use crate::angle::{Angle, TrueAnomaly};
-    use crate::orbit::flat::elliptic::EllipticOrbit;
     use crate::orbit::flat::Orbit2DBuilder;
+    use crate::orbit::flat::elliptic::EllipticOrbit;
     use crate::state_vectors::StateVectors;
 
     #[test]

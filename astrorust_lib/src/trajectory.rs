@@ -1,11 +1,11 @@
-use crate::{config, AU_IN_KM};
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::orbit::orbit_3d::{KeplerianElements, Orbit3D};
 use crate::state_vectors::StateVectors;
+use crate::{AU_IN_KM, config};
 use nalgebra::{Matrix3x2, Vector3};
-use std::ops::Mul;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Mul;
 
 #[derive(Debug, Clone)]
 pub enum Trajectory {
@@ -14,6 +14,20 @@ pub enum Trajectory {
 }
 
 impl Trajectory {
+    pub fn periapsis(&self) -> f64 {
+        match self {
+            Trajectory::Elliptic(orbit3_d) => orbit3_d.periapsis(),
+            Trajectory::Hyperbolic(orbit3_d) => orbit3_d.periapsis(),
+        }
+    }
+
+    pub fn apoapsis(&self) -> f64 {
+        match self {
+            Trajectory::Elliptic(orbit3_d) => orbit3_d.apoapsis(),
+            Trajectory::Hyperbolic(_) => f64::INFINITY,
+        }
+    }
+
     pub fn a(&self) -> f64 {
         match self {
             Trajectory::Elliptic(orbit3_d) => orbit3_d.orbit_2d.0.a(),

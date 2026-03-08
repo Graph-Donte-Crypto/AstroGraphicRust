@@ -11,6 +11,10 @@ use super::Orbit2D;
 pub struct HyperbolicOrbit(pub Orbit2D);
 
 impl HyperbolicOrbit {
+    pub fn periapsis(&self) -> f64 {
+        self.0.periapsis()
+    }
+
     fn r_from_sinh_cosh_H(&self, (sinh_H, cosh_H): (f64, f64)) -> Vector2<f64> {
         let Orbit2D { a, e, e_root, .. } = self.0;
         a * Vector2::new(cosh_H - e, -e_root * sinh_H)
