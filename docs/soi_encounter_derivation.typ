@@ -60,65 +60,92 @@ $ r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 = r_"SOI"^2 $ <constraint_C>
 
 Note: $bold(C)$ is *not* necessarily symmetric — it is a general $2 times 2$ real matrix with $|C_(j k)| <= 2$.
 
-== Expanding the Scalar Terms
+== Newton's Method
 
-=== Heliocentric distances $r_i^2$
+We seek to minimise $f(E_1, E_2) := r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 - r_"SOI"^2$ using Newton's method. Each iteration solves the $2 times 2$ linear system $bold(H) bold(delta) = -nabla f$ for the step $bold(delta) = (delta E_1, delta E_2)^top$, then updates $E_i <- E_i + delta E_i$.
 
-$ r_i^2 = a_i^2 (1 - e_i cos E_i)^2 $
+=== Deriving the gradient and Hessian
 
-=== Cross-term $bold(r)_1^top bold(C) bold(r)_2$
+The objective is $f = r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 - r_"SOI"^2$, with $r_"SOI"^2$ constant. We differentiate each part with respect to $E_i$.
 
-Decompose $bold(r)_i$ into its centered-ellipse part and eccentricity offset:
+==== Self-terms $r_i^2$
 
-$ bold(r)_i (E_i) = bold(r)_(0i)(E_i) - bold(æ)_i, quad bold(r)_(0i) = vec(a_i cos E_i, b_i sin E_i), quad bold(æ)_i = vec(a_i e_i, 0) $ <crossterm>
+Using $r_i = a_i (1 - e_i cos E_i)$:
 
-$ bold(r)_1^top bold(C) bold(r)_2 = (bold(r)_(01) - bold(æ)_1)^top bold(C) (bold(r)_(02) - bold(æ)_2) = bold(r)_(01)^top bold(C) bold(r)_(02) - bold(æ)_1^top bold(C) bold(r)_(02) - bold(r)_(01)^top bold(C) bold(æ)_2 + bold(æ)_1^top bold(C) bold(æ)_2 $
+$ (partial r_i^2) / (partial E_i) = 2 a_i^2 e_i sin E_i (1 - e_i cos E_i) $ <self_grad>
 
-=== Constant sub-expressions
+$ (partial^2 r_i^2) / (partial E_i^2) = 2 a_i^2 e_i (cos E_i - e_i + 2 e_i sin^2 E_i) $ <self_hess>
 
-Since $bold(C)$, $bold(æ)_1$, and $bold(æ)_2$ are all constants (independent of $E_1$, $E_2$), we introduce the following constants:
+and $partial r_i^2 \/ partial E_j = 0$ for $i != j$.
 
-$ bold(p)^top := bold(æ)_1^top bold(C) in RR^2, quad bold(q) := bold(C) bold(æ)_2 in RR^2, quad s := bold(æ)_1^top bold(C) bold(æ)_2 $ <s_def>
+==== Cross-term $bold(r)_1^top bold(C) bold(r)_2$
+
+The position vector @orbital_pos can be factored as $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$, where $op("diag")(a_i, b_i) := mat(a_i, 0; 0, b_i)$ is a diagonal matrix and $bold(p)_i$ is a dimensionless position-direction vector:
+
+$ bold(p)_i = vec(cos E_i - e_i, sin E_i) $ <p_def>
+
+Substituting $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$ into the cross-term and using $(bold(X) bold(p))^top = bold(p)^top bold(X)^top$:
+
+$ bold(r)_1^top bold(C) bold(r)_2
+    = (op("diag")(a_1, b_1) bold(p)_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2
+    = bold(p)_1^top op("diag")(a_1, b_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2 $
+
+Since diagonal matrices are symmetric ($op("diag")(x, y)^top = op("diag")(x, y)$):
+
+$ bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) bold(p)_2 $
+
+We have a chain of five matrices. Applying associativity ($bold(A)(bold(B) bold(C)) = (bold(A) bold(B)) bold(C)$) twice — first to $(bold(p)_1^top dot op("diag")(a_1, b_1)) dot bold(C) = bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))$, then to $(bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))) dot op("diag")(a_2, b_2) = bold(p)_1^top dot ((op("diag")(a_1, b_1) dot bold(C)) dot op("diag")(a_2, b_2))$ — lets us group the three constant middle factors into a single matrix. We define the *scaled coupling matrix*:
+
+$ bold(M) := op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) = mat(C_(11) a_1 a_2, C_(12) a_1 b_2; C_(21) a_2 b_1, C_(22) b_1 b_2) $ <M>
+
+giving $bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top bold(M) bold(p)_2$.
+
+Since $bold(M)$ is constant, differentiation acts only on $bold(p)_1$ and $bold(p)_2$. Define the derivative vectors:
+
+$ hat(bold(w))_i := dif bold(p)_i / (dif E_i) = vec(-sin E_i, cos E_i), quad hat(bold(u))_i := vec(cos E_i, sin E_i) $ <vecs>
 
 
-$ bold(r)_1^top bold(C) bold(r)_2 = bold(r)_(01)^top bold(C) bold(r)_(02) - bold(p)^top bold(r)_(02) - bold(r)_(01)^top bold(q) + s $
+To differentiate $bold(p)_1^top bold(M) bold(p)_2$ with respect to $E_1$, note that only $bold(p)_1$ depends on $E_1$. By associativity, $bold(p)_1^top bold(M) bold(p)_2 = bold(p)_1^top (bold(M) bold(p)_2)$, which is a dot product of $bold(p)_1$ with the constant vector $bold(M) bold(p)_2$. The derivative of a dot product with one constant factor is:
 
-$ r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 =  a_1^2 (1 - e_1 cos E_1)^2 + a_2^2 (1 - e_2 cos E_2)^2 - bold(r)_(01)^top bold(C) bold(r)_(02) + bold(p)^top bold(r)_(02) + bold(r)_(01)^top bold(q) - s $
+$ (partial (bold(p)_1^top (bold(M) bold(p)_2))) / (partial E_1) = hat(bold(w))_1^top (bold(M) bold(p)_2) = hat(bold(w))_1^top bold(M) bold(p)_2 $ <cross_grad>
 
-== Stationarity Conditions
+Similarly, for $E_2$ only $bold(p)_2$ depends on $E_2$. By associativity, $bold(p)_1^top bold(M) bold(p)_2 = (bold(p)_1^top bold(M)) bold(p)_2$, a dot product of the constant row vector $bold(p)_1^top bold(M)$ with $bold(p)_2$:
 
-To find the closest approach, minimize the squared distance:
+$ (partial ((bold(p)_1^top bold(M)) bold(p)_2)) / (partial E_2) = (bold(p)_1^top bold(M)) hat(bold(w))_2 = bold(p)_1^top bold(M) hat(bold(w))_2 $
 
-$ f(E_1, E_2) := r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 $
+The same reasoning applies to higher derivatives, replacing $bold(p)_i$ by successive derivatives $hat(bold(w))_i$, $-hat(bold(u))_i$:
 
-The eccentric-anomaly derivatives of the centered position vectors are:
+$ (partial^2 (bold(p)_1^top bold(M) bold(p)_2)) / (partial E_1^2) = -hat(bold(u))_1^top bold(M) bold(p)_2, quad (partial^2 (bold(p)_1^top bold(M) bold(p)_2)) / (partial E_2^2) = -bold(p)_1^top bold(M) hat(bold(u))_2 $ <cross_hess_diag>
 
-$ dot(bold(r))_(0i) := (partial bold(r)_(0i)) / (partial E_i) = vec(-a_i sin E_i, b_i cos E_i) $
+$ (partial^2 (bold(p)_1^top bold(M) bold(p)_2)) / (partial E_1 partial E_2) = hat(bold(w))_1^top bold(M) hat(bold(w))_2 $ <cross_hess_off>
 
-Since $bold(æ)_i$ is constant, $(partial bold(r)_i) / (partial E_i) = dot(bold(r))_(0i)$.
+==== Combined expressions
 
-=== Partial derivatives
+Combining $f = r_1^2 + r_2^2 - bold(p)_1^top bold(M) bold(p)_2 - r_"SOI"^2$ using @self_grad with @cross_grad, and @self_hess with @cross_hess_diag and @cross_hess_off:
 
-Setting the partial derivatives to zero and using $(partial r_i^2) / (partial E_i) = 2 a_i^2 e_i sin E_i (1 - e_i cos E_i)$:
+=== Gradient
 
-$ (partial f) / (partial E_1) = 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - dot(bold(r))_(01)^top bold(C) bold(r)_2 = 0 $ <stationary_E1>
+$ f_1 = 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - hat(bold(w))_1^top bold(M) bold(p)_2 $ <grad1>
 
-$ (partial f) / (partial E_2) = 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(r)_1^top bold(C) dot(bold(r))_(02) = 0 $ <stationary_E2>
+$ f_2 = 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(p)_1^top bold(M) hat(bold(w))_2 $ <grad2>
 
-=== Scaled coupling constants
+=== Hessian
 
-To expand the bilinear terms into trigonometric form, define the four scaled coupling constants:
+The Hessian $bold(H)$ is symmetric ($H_(12) = H_(21)$):
 
-$ alpha := a_1 a_2 C_(11), quad beta := a_1 b_2 C_(12), quad gamma := b_1 a_2 C_(21), quad delta := b_1 b_2 C_(22) $
+$ H_(11) = 2 a_1^2 e_1 (cos E_1 - e_1 + 2 e_1 sin^2 E_1) + hat(bold(u))_1^top bold(M) bold(p)_2 $ <H11>
 
-The cross-terms in @stationary_E1 and @stationary_E2 expand as:
+$ H_(22) = 2 a_2^2 e_2 (cos E_2 - e_2 + 2 e_2 sin^2 E_2) + bold(p)_1^top bold(M) hat(bold(u))_2 $ <H22>
 
-$ dot(bold(r))_(01)^top bold(C) bold(r)_2 = (-alpha sin E_1 + gamma cos E_1)(cos E_2 - e_2) + (-beta sin E_1 + delta cos E_1) sin E_2 $
+$ H_(12) = -hat(bold(w))_1^top bold(M) hat(bold(w))_2 $ <H12>
 
-$ bold(r)_1^top bold(C) dot(bold(r))_(02) = (-alpha sin E_2 + beta cos E_2)(cos E_1 - e_1) + (-gamma sin E_2 + delta cos E_2) sin E_1 $
+=== Solving the Newton step
 
-The full stationarity conditions are therefore:
+The $2 times 2$ system is solved directly via Cramer's rule:
 
-$ 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) = (-alpha sin E_1 + gamma cos E_1)(cos E_2 - e_2) + (-beta sin E_1 + delta cos E_1) sin E_2 $
+$ Delta = H_(11) H_(22) - H_(12)^2 $
 
-$ 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) = (-alpha sin E_2 + beta cos E_2)(cos E_1 - e_1) + (-gamma sin E_2 + delta cos E_2) sin E_1 $
+$ delta E_1 = (f_1 H_(22) - f_2 H_(12)) / (-Delta), quad delta E_2 = (f_2 H_(11) - f_1 H_(12)) / (-Delta) $
+
+All coupling terms are bilinear forms $bold(x)^top bold(M) bold(y)$ with 2D vectors, each requiring 4 multiplies and 3 adds. The five needed dot products ($hat(bold(w))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(w))_2$, $hat(bold(u))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(u))_2$, $hat(bold(w))_1^top bold(M) hat(bold(w))_2$) can share the intermediate products $bold(M) bold(p)_2$, $bold(M) hat(bold(w))_2$, $bold(M) hat(bold(u))_2$ (each a 2D matrix-vector multiply).
+

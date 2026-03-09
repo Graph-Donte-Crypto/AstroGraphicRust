@@ -42,6 +42,13 @@ impl Trajectory {
         }
     }
 
+    pub fn orb_to_ecl(&self) -> &Matrix3x2<f64> {
+        match self {
+            Trajectory::Elliptic(orbit3_d) => orbit3_d.orb_to_ecl(),
+            Trajectory::Hyperbolic(orbit3_d) => orbit3_d.orb_to_ecl(),
+        }
+    }
+
     pub fn t0(&self) -> f64 {
         match self {
             Trajectory::Elliptic(orbit3_d) => orbit3_d.orbit_2d.0.a(),
