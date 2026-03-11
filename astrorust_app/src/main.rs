@@ -92,7 +92,7 @@ fn main() {
     let planets_epoch = system.t0;
     let started_at_date =
         chrono::DateTime::parse_from_rfc3339("1979-04-15T00:00:00Z").unwrap().to_utc();
-    // chrono::DateTime::parse_from_rfc3339("1977-08-23T11:29:11Z").unwrap().to_utc();
+    // chrono::DateTime::parse_from_rfc3339("1993-08-23T11:29:11Z").unwrap().to_utc();
     let started_at = Instant::now();
     let mut previous_frame = Instant::now();
     let mut simulated_seconds = (started_at_date - planets_epoch).as_seconds_f64();

@@ -6,6 +6,7 @@ use crate::state_vectors::StateVectors;
 use nalgebra::{Matrix3x2, Vector3};
 use std::f64::consts::TAU;
 use std::ops::Mul;
+use crate::time::Time;
 
 #[derive(Builder, CopyGetters, Debug, Clone, PartialEq)]
 // #[builder(build_fn(validate = "Self::validate"))]
@@ -43,6 +44,10 @@ impl Orbit3D<EllipticOrbit> {
 
     pub fn apoapsis(&self) -> f64 {
         self.orbit_2d.apoapsis()
+    }
+
+    pub fn period(&self) -> Time {
+        self.orbit_2d.period()
     }
 
     pub fn from_state_vectors(mu: f64, r: Vector3<f64>, v: Vector3<f64>, t: f64) -> Self {

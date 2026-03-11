@@ -125,9 +125,9 @@ Combining $f = r_1^2 + r_2^2 - bold(p)_1^top bold(M) bold(p)_2 - r_"SOI"^2$ usin
 
 === Gradient
 
-$ f_1 = 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - hat(bold(w))_1^top bold(M) bold(p)_2 $ <grad1>
+$ (partial f) / (partial E_1) = 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - hat(bold(w))_1^top bold(M) bold(p)_2 $ <grad1>
 
-$ f_2 = 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(p)_1^top bold(M) hat(bold(w))_2 $ <grad2>
+$ (partial f) / (partial E_2) = 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(p)_1^top bold(M) hat(bold(w))_2 $ <grad2>
 
 === Hessian
 
@@ -145,7 +145,98 @@ The $2 times 2$ system is solved directly via Cramer's rule:
 
 $ Delta = H_(11) H_(22) - H_(12)^2 $
 
-$ delta E_1 = (f_1 H_(22) - f_2 H_(12)) / (-Delta), quad delta E_2 = (f_2 H_(11) - f_1 H_(12)) / (-Delta) $
+$ delta E_1 = ((partial f) / (partial E_1) H_(22) - (partial f) / (partial E_2) H_(12)) / (-Delta), quad delta E_2 = ((partial f) / (partial E_2) H_(11) - (partial f) / (partial E_1) H_(12)) / (-Delta) $
 
 All coupling terms are bilinear forms $bold(x)^top bold(M) bold(y)$ with 2D vectors, each requiring 4 multiplies and 3 adds. The five needed dot products ($hat(bold(w))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(w))_2$, $hat(bold(u))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(u))_2$, $hat(bold(w))_1^top bold(M) hat(bold(w))_2$) can share the intermediate products $bold(M) bold(p)_2$, $bold(M) hat(bold(w))_2$, $bold(M) hat(bold(u))_2$ (each a 2D matrix-vector multiply).
+
+== Coarse Encounter Interval
+
+Before running Newton's method, we restrict the search to $E_1$ values where the spacecraft's heliocentric distance overlaps with the planet's distance range $plus.minus r_"SOI"$.
+
+=== Radial overlap condition
+
+The heliocentric distance of the spacecraft is $r_1 = a_1 (1 - e_1 cos E_1)$. An encounter requires:
+
+$ a_2 (1 - e_2) - r_"SOI" <= r_1 <= a_2 (1 + e_2) + r_"SOI" $
+
+Substituting $r_1 = a_1 (1 - e_1 cos E_1)$ and solving for $cos E_1$:
+
+$ (a_1 - a_2 (1 + e_2) - r_"SOI") / (a_1 e_1) <= cos E_1 <= (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) $ <coarse_bounds>
+
+Clamping both sides to $[-1, 1]$ and applying $arccos$ (which reverses the inequality) gives two symmetric intervals $[E_"lo", E_"hi"]$ and $[-E_"lo", -E_"hi"]$ in $E_1$. If no valid interval exists (i.e.~the clamped range is empty), no encounter is possible at any $E_1$.
+
+=== Initial guess via parabolic interpolation
+
+For each of the two symmetric $E_1$ intervals, we evaluate $f$ at three points: the endpoints and midpoint. Here $E_2$ is estimated by projecting the spacecraft's 3D position onto the planet's orbital plane and inverting the ellipse parametrisation:
+
+$ E_2 = op("atan2")(q_y \/ b_2, quad q_x \/ a_2 + e_2) $
+
+where $bold(q) = bold(B)^top bold(A) bold(r)_1$ is the projection. This matches the eccentric anomaly that $bold(q)$ would have if it lay on the planet's ellipse.
+
+Given three samples $(x_0, f_0)$, $(x_1, f_1)$, $(x_2, f_2)$, the minimiser of the interpolating quadratic is:
+
+$ E_1^* = x_1 - 1/2 ((x_1 - x_0)^2 (f_1 - f_2) - (x_1 - x_2)^2 (f_1 - f_0)) / ((x_1 - x_0)(f_1 - f_2) - (x_1 - x_2)(f_1 - f_0)) $ <parabolic>
+
+Newton's method is then run from the best initial guess across both branches. If the first branch fails to converge to $f <= r_"SOI"^2$, the second branch is tried.
+
+== Encounter Intervals
+
+The goal is to find the set of $(E_1, E_2)$ pairs where the distance is at most $r_"SOI"$:
+
+$ cal(R) := {(E_1, E_2) : f(E_1, E_2) <= r_"SOI"^2} $
+
+=== $E_2$ interval for fixed $E_1$
+
+For a fixed $E_1$, all terms depending on $E_1$ are constants. Define $bold(v) := bold(M)^top bold(p)_1$, so that $bold(p)_1^top bold(M) bold(p)_2 = bold(v)^top bold(p)_2 = v_1 (cos E_2 - e_2) + v_2 sin E_2$. Then:
+
+$ f(E_2) = underbrace(r_1^2 + a_2^2 + v_1 e_2 - r_"SOI"^2, kappa) - (2 a_2^2 e_2 + v_1) cos E_2 - v_2 sin E_2 + a_2^2 e_2^2 cos^2 E_2 $ <f_fixed_E1>
+
+Applying $cos^2 E_2 = (1 + cos 2 E_2) / 2$:
+
+$ f(E_2) = kappa' - (2 a_2^2 e_2 + v_1) cos E_2 - v_2 sin E_2 + (a_2^2 e_2^2) / 2 cos 2 E_2 $ <f_fixed_E1_expanded>
+
+where $kappa' = kappa + a_2^2 e_2^2 \/ 2$. This mixes first and second harmonics of $E_2$.
+
+==== Weierstrass substitution
+
+Substituting $t = tan(E_2 \/ 2)$, so that $cos E_2 = (1 - t^2) \/ (1 + t^2)$ and $sin E_2 = 2t \/ (1 + t^2)$, and using $cos 2 E_2 = 2 cos^2 E_2 - 1$:
+
+$ cos 2 E_2 = (2(1 - t^2)^2) / (1 + t^2)^2 - 1 = (1 - 6t^2 + t^4) / (1 + t^2)^2 $
+
+Multiplying @f_fixed_E1_expanded through by $(1 + t^2)^2$ yields a quartic polynomial in $t$:
+
+$ P(t) = (1 + t^2)^2 f(E_2) = 0 $
+
+The real roots $t_1, ..., t_k$ of $P(t) = 0$ (with $k <= 4$) correspond to the $E_2$ boundary values via $E_2 = 2 arctan t_i$. The encounter intervals are the segments between consecutive roots where $P(t) <= 0$.
+
+=== $E_1$ interval for fixed $E_2$
+
+By symmetry, fixing $E_2$ and defining $bold(w) := bold(M) bold(p)_2$ gives the analogous expression:
+
+$ f(E_1) = underbrace(r_2^2 + a_1^2 + w_1 e_1 - r_"SOI"^2, lambda) - (2 a_1^2 e_1 + w_1) cos E_1 - w_2 sin E_1 + a_1^2 e_1^2 cos^2 E_1 $
+
+The same Weierstrass substitution $s = tan(E_1 \/ 2)$ yields a quartic in $s$.
+
+=== Boundary of $cal(R)$
+
+The boundary $partial cal(R)$ is the level set $f(E_1, E_2) = r_"SOI"^2$. It can be traced by:
+
++ Finding any point on $partial cal(R)$ using Newton's method (§1.5).
++ Following the implicit curve $f = r_"SOI"^2$ via the tangent direction. The gradient $nabla f$ is normal to the level set, so the tangent is:
+
+$ bold(t) = (-partial f \/ partial E_2, quad partial f \/ partial E_1) $
+
+A predictor-corrector scheme (Euler step along $bold(t)$, then Newton correction back to $f = r_"SOI"^2$) traces the full boundary.
+
+=== Time constraint
+
+Eccentric anomalies are linked to time via Kepler's equation:
+
+$ M_i = E_i - e_i sin E_i = n_i (t - t_(0,i)) $
+
+where $n_i = 2 pi \/ T_i$ is the mean motion and $t_(0,i)$ is the epoch of periapsis passage. At a shared time $t$, the relationship between $E_1$ and $E_2$ is:
+
+$ E_1 - e_1 sin E_1 - n_1 / n_2 (E_2 - e_2 sin E_2) = n_1 (t_(0,2) - t_(0,1)) + (n_1 - n_2) / n_2 M_(0,2) $
+
+This is a curve in $(E_1, E_2)$ space. An encounter occurs where this curve intersects the feasible region $cal(R)$.
 

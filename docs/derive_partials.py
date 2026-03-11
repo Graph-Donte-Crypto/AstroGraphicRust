@@ -15,6 +15,21 @@ from sympy import *
 
 init_printing(use_unicode=True, wrap_line=False)
 
+# Collect pure sin(Ei) terms (exclude cross-terms like sin(E1)*sin(E2))
+def collect_pure_trig(expr, func, E_target, E_other):
+    """Group pure func(E_target) terms in expr, leaving the rest untouched."""
+    expr = expand(expr)
+    other_func = cos if func == sin else sin
+    coeff = S.Zero
+    rest = S.Zero
+    for term in Add.make_args(expr):
+        c = term.coeff(func(E_target))
+        if c != 0 and not c.has(E_other) and not c.has(other_func(E_target)):
+            coeff += c
+        else:
+            rest += term
+    return rest + UnevaluatedExpr(coeff) * func(E_target)
+
 # Eccentric anomalies
 E1, E2 = symbols("E_1 E_2")
 
@@ -41,25 +56,11 @@ cross = (r1.T * C).dot(r2)
 # Squared distance
 f = r1_sq + r2_sq - cross
 
-#pprint(simplify(f))
+pprint(trigsimp(f))
 
 # Gradient
 df_dE1, df_dE2 = [expand(g) for g in derive_by_array(f, [E1, E2])]
 
-# Collect pure sin(Ei) terms (exclude cross-terms like sin(E1)*sin(E2))
-def collect_pure_trig(expr, func, E_target, E_other):
-    """Group pure func(E_target) terms in expr, leaving the rest untouched."""
-    expr = expand(expr)
-    other_func = cos if func == sin else sin
-    coeff = S.Zero
-    rest = S.Zero
-    for term in Add.make_args(expr):
-        c = term.coeff(func(E_target))
-        if c != 0 and not c.has(E_other) and not c.has(other_func(E_target)):
-            coeff += c
-        else:
-            rest += term
-    return rest + UnevaluatedExpr(coeff) * func(E_target)
 
 df_dE1 = collect_pure_trig(df_dE1, sin, E1, E2)
 df_dE2 = collect_pure_trig(df_dE2, sin, E2, E1)
