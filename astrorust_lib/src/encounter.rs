@@ -137,6 +137,175 @@ pub fn find_encounter(
     None
 }
 
+/// Compute tight encounter intervals [E₁_min, E₁_max] and [E₂_min, E₂_max]
+/// by solving {f=0, ∂f/∂E₂=0} and {f=0, ∂f/∂E₁=0} respectively.
+///
+/// Returns ((E₁_min, E₁_max), (E₂_min, E₂_max)) in radians, or None if
+/// no encounter exists.
+pub fn encounter_intervals(
+    orbit1: &Orbit3D<EllipticOrbit>,
+    orbit2: &Orbit3D<EllipticOrbit>,
+    r_soi: f64,
+) -> Option<((f64, f64), (f64, f64))> {
+    // Quick check: does the SOI ever get entered?
+    find_encounter(orbit1, orbit2, r_soi)?;
+
+    let a1 = orbit1.orbit_2d.0.a();
+    let e1 = orbit1.orbit_2d.0.e();
+    let b1 = a1 * (1.0 - e1 * e1).sqrt();
+    let a2 = orbit2.orbit_2d.0.a();
+    let e2 = orbit2.orbit_2d.0.e();
+    let b2 = a2 * (1.0 - e2 * e2).sqrt();
+    let m = scaled_coupling_matrix(orbit1, orbit2);
+    let r_soi_sq = r_soi * r_soi;
+
+    // Coarse interval gives two symmetric E₁ arcs: [hi_rad, lo_rad] and [-lo_rad, -hi_rad]
+    // (acos reverses the inequality, so hi_deg < lo_deg but hi_rad < lo_rad).
+    let ((lo_deg, hi_deg), _) = coarse_encounter_interval(
+        &Trajectory::Elliptic(orbit1.clone()),
+        orbit2,
+        r_soi,
+    );
+    let coarse_lo = lo_deg.to_radians();
+    let coarse_hi = hi_deg.to_radians();
+
+    // Estimate E₂ from E₁ by projecting onto the planet's orbital plane.
+    let estimate_e2 = |ea1: f64| -> f64 {
+        let r1_2d = Vector2::new(a1 * (ea1.cos() - e1), b1 * ea1.sin());
+        let r1_3d = orbit1.orb_to_ecl() * r1_2d;
+        let q = orbit2.orb_to_ecl().transpose() * r1_3d;
+        (q.y / b2).atan2(q.x / a2 + e2)
+    };
+
+    // Use the coarse interval start/end as initial guesses for both ± branches.
+    // For E₁ bounds: solve {f=0, g₂=0} — the E₁ extrema of the constraint curve.
+    // For E₂ bounds: solve {f=0, g₁=0} — the E₂ extrema of the constraint curve.
+    // The lo endpoint should converge to E₁_min, the hi endpoint to E₁_max (and vice versa).
+    let mut e1_results = Vec::new();
+    let mut e2_results = Vec::new();
+
+    for sign in [1.0_f64, -1.0] {
+        for &ea1_init in &[sign * coarse_lo, sign * coarse_hi] {
+            let ea2_init = estimate_e2(ea1_init);
+
+            if let Some(pt) = newton_constraint(
+                ea1_init, ea2_init, a1, e1, a2, e2, &m, r_soi_sq,
+                ConstraintKind::E1Extremum,
+            ) {
+                e1_results.push(pt);
+            }
+
+            if let Some(pt) = newton_constraint(
+                ea1_init, ea2_init, a1, e1, a2, e2, &m, r_soi_sq,
+                ConstraintKind::E2Extremum,
+            ) {
+                e2_results.push(pt);
+            }
+        }
+    }
+
+    if e1_results.is_empty() || e2_results.is_empty() {
+        return None;
+    }
+
+    let e1_min = e1_results.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
+    let e1_max = e1_results.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+    let e2_min = e2_results.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
+    let e2_max = e2_results.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+
+    Some(((e1_min, e1_max), (e2_min, e2_max)))
+}
+
+#[derive(Clone, Copy)]
+enum ConstraintKind {
+    /// Solve {f=0, g₂=0} to find E₁ turning points
+    E1Extremum,
+    /// Solve {f=0, g₁=0} to find E₂ turning points
+    E2Extremum,
+}
+
+/// Newton's method on the 2×2 system for encounter interval bounds.
+///
+/// For E₁ extrema: solves {f=0, g₂=0} with Jacobian [[g₁, g₂], [H₁₂, H₂₂]]
+/// For E₂ extrema: solves {f=0, g₁=0} with Jacobian [[g₁, g₂], [H₁₁, H₁₂]]
+fn newton_constraint(
+    mut ea1: f64,
+    mut ea2: f64,
+    a1: f64,
+    e1: f64,
+    a2: f64,
+    e2: f64,
+    m: &Matrix2<f64>,
+    r_soi_sq: f64,
+    kind: ConstraintKind,
+) -> Option<(f64, f64)> {
+    for _ in 0..MAX_ITER {
+        let (sin1, cos1) = ea1.sin_cos();
+        let (sin2, cos2) = ea2.sin_cos();
+
+        let p1 = Vector2::new(cos1 - e1, sin1);
+        let p2 = Vector2::new(cos2 - e2, sin2);
+        let w1 = Vector2::new(-sin1, cos1);
+        let w2 = Vector2::new(-sin2, cos2);
+        let u1 = Vector2::new(cos1, sin1);
+        let u2 = Vector2::new(cos2, sin2);
+
+        let m_p2 = m * p2;
+        let m_w2 = m * w2;
+        let m_u2 = m * u2;
+
+        let r1 = a1 * (1.0 - e1 * cos1);
+        let r2 = a2 * (1.0 - e2 * cos2);
+        let f = r1 * r1 + r2 * r2 - p1.dot(&m_p2) - r_soi_sq;
+
+        // Gradient
+        let g1 = 2.0 * a1 * a1 * e1 * sin1 * (1.0 - e1 * cos1) - w1.dot(&m_p2);
+        let g2 = 2.0 * a2 * a2 * e2 * sin2 * (1.0 - e2 * cos2) - p1.dot(&m_w2);
+
+        // Hessian
+        let h11 = 2.0 * a1 * a1 * e1 * (cos1 - e1 + 2.0 * e1 * sin1 * sin1) + u1.dot(&m_p2);
+        let h22 = 2.0 * a2 * a2 * e2 * (cos2 - e2 + 2.0 * e2 * sin2 * sin2) + p1.dot(&m_u2);
+        let h12 = -w1.dot(&m_w2);
+
+        let (d_e1, d_e2) = match kind {
+            // {f=0, g₂=0}: J = [[g₁, g₂], [H₁₂, H₂₂]]
+            // Cramer: Δ = g₁·H₂₂ - g₂·H₁₂
+            ConstraintKind::E1Extremum => {
+                let det = g1 * h22 - g2 * h12;
+                if det.abs() < TOL {
+                    return None;
+                }
+                (-(f * h22 - g2 * g2) / det, -(g2 * g1 - f * h12) / det)
+            }
+            // {f=0, g₁=0}: J = [[g₁, g₂], [H₁₁, H₁₂]]
+            // Cramer: Δ = g₁·H₁₂ - g₂·H₁₁
+            ConstraintKind::E2Extremum => {
+                let det = g1 * h12 - g2 * h11;
+                if det.abs() < TOL {
+                    return None;
+                }
+                (-(f * h12 - g1 * g2) / det, -(g1 * g1 - f * h11) / det)
+            }
+        };
+
+        ea1 += d_e1;
+        ea2 += d_e2;
+
+        if d_e1.abs() < TOL && d_e2.abs() < TOL {
+            // Verify f ≈ 0 (distance equals r_soi).
+            if f.abs() < r_soi_sq * 1e-6 {
+                // Normalize to [-π, π].
+                ea1 = (ea1 + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+                ea2 = (ea2 + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+                return Some((ea1, ea2));
+            }
+            return None;
+        }
+    }
+
+    None
+}
+
 /// Newton's method to minimize f = r₁² + r₂² - p₁ᵀMp₂, returning (E₁, E₂)
 /// if the minimum distance is within r_soi.
 fn newton_minimize(
@@ -384,6 +553,72 @@ mod tests {
                 "         -branch:  linear d={:>12.0}  crossing d={:>12.0}  parabolic d={:>12.0}  actual d={:>12.0}",
                 d_linear[1], f_cross_neg.sqrt(), d_para[1], d_actual[1]
             );
+        }
+    }
+
+    #[test]
+    fn encounter_intervals_vs_coarse() {
+        let config_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../config");
+        let config = Config::load_from_yaml(&format!("{config_dir}/config.yml")).unwrap();
+        let system =
+            StarSystem::load_from_yaml(&format!("{config_dir}/system/solar.yml")).unwrap();
+
+        let spacecraft: Orbit3D<EllipticOrbit> =
+            KeplerianElements::from(config.spacecraft.orbit).into();
+        let traj = Trajectory::Elliptic(spacecraft.clone());
+
+        for name in ["Earth", "Mars", "Jupiter"] {
+            let planet_cfg = system.planets.iter().find(|p| p.body.name == name).unwrap();
+            let planet: Orbit3D<EllipticOrbit> =
+                KeplerianElements::from(planet_cfg.orbit.clone()).into();
+            let r_soi = planet_cfg.soi_radius();
+
+            let ((coarse_lo_deg, coarse_hi_deg), _) = coarse_encounter_interval(&traj, &planet, r_soi);
+            // acos reverses the inequality, so coarse_hi_deg > coarse_lo_deg
+            // but coarse_hi_rad > coarse_lo_rad (larger angle = larger rad).
+            let coarse_min_rad = coarse_lo_deg.to_radians(); // smaller angle
+            let coarse_max_rad = coarse_hi_deg.to_radians(); // larger angle
+
+            println!("\n{name}:  r_soi = {r_soi:.0}");
+            println!("  coarse E₁: [{coarse_min_rad:.4}, {coarse_max_rad:.4}] rad  ({coarse_lo_deg:.2}°, {coarse_hi_deg:.2}°)");
+
+            let result = encounter_intervals(&spacecraft, &planet, r_soi);
+            match result {
+                Some(((e1_min, e1_max), (e2_min, e2_max))) => {
+                    println!(
+                        "  tight  E₁: [{e1_min:.4}, {e1_max:.4}] rad  ({:.2}°, {:.2}°)",
+                        e1_min.to_degrees(),
+                        e1_max.to_degrees()
+                    );
+                    println!(
+                        "  tight  E₂: [{e2_min:.4}, {e2_max:.4}] rad  ({:.2}°, {:.2}°)",
+                        e2_min.to_degrees(),
+                        e2_max.to_degrees()
+                    );
+
+                    let coarse_width = coarse_max_rad - coarse_min_rad;
+                    let tight_width = e1_max - e1_min;
+                    let reduction = (1.0 - tight_width / coarse_width) * 100.0;
+                    println!("  E₁ reduction: {coarse_width:.4} → {tight_width:.4} rad  ({reduction:.1}% narrower)");
+
+                    // Tight E₁ bounds must be inside the coarse bounds.
+                    assert!(
+                        e1_min >= coarse_min_rad - 0.01,
+                        "{name}: tight E₁_min {e1_min:.4} < coarse min {coarse_min_rad:.4}"
+                    );
+                    assert!(
+                        e1_max <= coarse_max_rad + 0.01,
+                        "{name}: tight E₁_max {e1_max:.4} > coarse max {coarse_max_rad:.4}"
+                    );
+
+                    // Tight interval must be non-empty
+                    assert!(e1_min < e1_max, "{name}: E₁ interval empty");
+                    assert!(e2_min < e2_max, "{name}: E₂ interval empty");
+                }
+                None => {
+                    println!("  tight: no encounter found");
+                }
+            }
         }
     }
 }

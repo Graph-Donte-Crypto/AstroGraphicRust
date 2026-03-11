@@ -179,64 +179,336 @@ $ E_1^* = x_1 - 1/2 ((x_1 - x_0)^2 (f_1 - f_2) - (x_1 - x_2)^2 (f_1 - f_0)) / ((
 
 Newton's method is then run from the best initial guess across both branches. If the first branch fails to converge to $f <= r_"SOI"^2$, the second branch is tried.
 
-== Encounter Intervals
+== Encounter Intervals in $E_1$ and $E_2$
 
-The goal is to find the set of $(E_1, E_2)$ pairs where the distance is at most $r_"SOI"$:
+The constraint $f(E_1, E_2) = 0$ defines an implicit curve (or set of curves) in the $(E_1, E_2)$ plane. The *encounter interval* $[E_(1,min), E_(1,max)]$ is the projection of this curve onto the $E_1$ axis, and $[E_(2,min), E_(2,max)]$ is the projection onto the $E_2$ axis. For every $E_1$ in the first interval there exists at least one $E_2$ in the second interval such that the distance equals $r_"SOI"$.
 
-$ cal(R) := {(E_1, E_2) : f(E_1, E_2) <= r_"SOI"^2} $
+=== Extrema via implicit differentiation
 
-=== $E_2$ interval for fixed $E_1$
+Along the constraint curve $f(E_1, E_2) = 0$, total differentiation gives:
 
-For a fixed $E_1$, all terms depending on $E_1$ are constants. Define $bold(v) := bold(M)^top bold(p)_1$, so that $bold(p)_1^top bold(M) bold(p)_2 = bold(v)^top bold(p)_2 = v_1 (cos E_2 - e_2) + v_2 sin E_2$. Then:
+$ (partial f) / (partial E_1) dif E_1 + (partial f) / (partial E_2) dif E_2 = 0 $
 
-$ f(E_2) = underbrace(r_1^2 + a_2^2 + v_1 e_2 - r_"SOI"^2, kappa) - (2 a_2^2 e_2 + v_1) cos E_2 - v_2 sin E_2 + a_2^2 e_2^2 cos^2 E_2 $ <f_fixed_E1>
+so the implicit derivatives are:
 
-Applying $cos^2 E_2 = (1 + cos 2 E_2) / 2$:
+$ (dif E_1) / (dif E_2) = -(partial f \/ partial E_2) / (partial f \/ partial E_1), quad (dif E_2) / (dif E_1) = -(partial f \/ partial E_1) / (partial f \/ partial E_2) $ <implicit_deriv>
 
-$ f(E_2) = kappa' - (2 a_2^2 e_2 + v_1) cos E_2 - v_2 sin E_2 + (a_2^2 e_2^2) / 2 cos 2 E_2 $ <f_fixed_E1_expanded>
+The extrema of $E_1$ along the constraint curve occur where the tangent is vertical, i.e. $dif E_1 \/ dif E_2 = 0$, which requires:
 
-where $kappa' = kappa + a_2^2 e_2^2 \/ 2$. This mixes first and second harmonics of $E_2$.
+$ (partial f) / (partial E_2) = 0 $ <E1_crit>
 
-==== Weierstrass substitution
+Similarly, the extrema of $E_2$ occur where $dif E_2 \/ dif E_1 = 0$, requiring:
 
-Substituting $t = tan(E_2 \/ 2)$, so that $cos E_2 = (1 - t^2) \/ (1 + t^2)$ and $sin E_2 = 2t \/ (1 + t^2)$, and using $cos 2 E_2 = 2 cos^2 E_2 - 1$:
+$ (partial f) / (partial E_1) = 0 $ <E2_crit>
 
-$ cos 2 E_2 = (2(1 - t^2)^2) / (1 + t^2)^2 - 1 = (1 - 6t^2 + t^4) / (1 + t^2)^2 $
+=== System for $E_1$ bounds
 
-Multiplying @f_fixed_E1_expanded through by $(1 + t^2)^2$ yields a quartic polynomial in $t$:
+To find $E_(1,min)$ and $E_(1,max)$, solve the $2 times 2$ system:
 
-$ P(t) = (1 + t^2)^2 f(E_2) = 0 $
+$ cases(
+  f(E_1, E_2) = 0,
+  (partial f) / (partial E_2) = 0
+) $ <E1_system>
 
-The real roots $t_1, ..., t_k$ of $P(t) = 0$ (with $k <= 4$) correspond to the $E_2$ boundary values via $E_2 = 2 arctan t_i$. The encounter intervals are the segments between consecutive roots where $P(t) <= 0$.
+Using @grad2, the second equation is:
 
-=== $E_1$ interval for fixed $E_2$
+$ 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(p)_1^top bold(M) hat(bold(w))_2 = 0 $
 
-By symmetry, fixing $E_2$ and defining $bold(w) := bold(M) bold(p)_2$ gives the analogous expression:
+Newton's method for this system uses the Jacobian:
 
-$ f(E_1) = underbrace(r_2^2 + a_1^2 + w_1 e_1 - r_"SOI"^2, lambda) - (2 a_1^2 e_1 + w_1) cos E_1 - w_2 sin E_1 + a_1^2 e_1^2 cos^2 E_1 $
+$ bold(J)_1 = mat(
+  (partial f) / (partial E_1), (partial f) / (partial E_2);
+  (partial^2 f) / (partial E_1 partial E_2), (partial^2 f) / (partial E_2^2)
+) = mat(
+  g_1, g_2;
+  H_(12), H_(22)
+) $ <J1>
 
-The same Weierstrass substitution $s = tan(E_1 \/ 2)$ yields a quartic in $s$.
+where $g_1 := partial f \/ partial E_1$ (@grad1), $g_2 := partial f \/ partial E_2$ (@grad2), and $H_(12)$, $H_(22)$ are the Hessian entries (@H12, @H22). The Newton step $bold(delta) = (delta E_1, delta E_2)^top$ solves $bold(J)_1 bold(delta) = -(f, g_2)^top$ via Cramer's rule:
 
-=== Boundary of $cal(R)$
+$ Delta_1 = g_1 H_(22) - g_2 H_(12) $
 
-The boundary $partial cal(R)$ is the level set $f(E_1, E_2) = r_"SOI"^2$. It can be traced by:
+$ delta E_1 = (f H_(22) - g_2^2) / Delta_1, quad delta E_2 = (f H_(12) - g_1 g_2) / Delta_1 $ <E1_step>
 
-+ Finding any point on $partial cal(R)$ using Newton's method (§1.5).
-+ Following the implicit curve $f = r_"SOI"^2$ via the tangent direction. The gradient $nabla f$ is normal to the level set, so the tangent is:
+Note that at convergence ($g_2 = 0$), the determinant simplifies to $Delta_1 = g_1 H_(22)$.
 
-$ bold(t) = (-partial f \/ partial E_2, quad partial f \/ partial E_1) $
+=== System for $E_2$ bounds
 
-A predictor-corrector scheme (Euler step along $bold(t)$, then Newton correction back to $f = r_"SOI"^2$) traces the full boundary.
+To find $E_(2,min)$ and $E_(2,max)$, solve:
 
-=== Time constraint
+$ cases(
+  f(E_1, E_2) = 0,
+  (partial f) / (partial E_1) = 0
+) $ <E2_system>
 
-Eccentric anomalies are linked to time via Kepler's equation:
+Using @grad1, the second equation is:
 
-$ M_i = E_i - e_i sin E_i = n_i (t - t_(0,i)) $
+$ 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - hat(bold(w))_1^top bold(M) bold(p)_2 = 0 $
 
-where $n_i = 2 pi \/ T_i$ is the mean motion and $t_(0,i)$ is the epoch of periapsis passage. At a shared time $t$, the relationship between $E_1$ and $E_2$ is:
+The Jacobian is:
 
-$ E_1 - e_1 sin E_1 - n_1 / n_2 (E_2 - e_2 sin E_2) = n_1 (t_(0,2) - t_(0,1)) + (n_1 - n_2) / n_2 M_(0,2) $
+$ bold(J)_2 = mat(
+  (partial f) / (partial E_1), (partial f) / (partial E_2);
+  (partial^2 f) / (partial E_1^2), (partial^2 f) / (partial E_1 partial E_2)
+) = mat(
+  g_1, g_2;
+  H_(11), H_(12)
+) $ <J2>
 
-This is a curve in $(E_1, E_2)$ space. An encounter occurs where this curve intersects the feasible region $cal(R)$.
+The Newton step solves $bold(J)_2 bold(delta) = -(f, g_1)^top$:
+
+$ Delta_2 = g_1 H_(12) - g_2 H_(11) $
+
+$ delta E_1 = (f H_(12) - g_1 g_2) / Delta_2, quad delta E_2 = (g_1^2 - f H_(11)) / Delta_2 $ <E2_step>
+
+At convergence ($g_1 = 0$), the determinant simplifies to $Delta_2 = -g_2 H_(11)$.
+
+=== Geometric interpretation
+
+The constraint curve $f = 0$ forms a closed loop (or multiple loops) in the $(E_1, E_2)$ torus. The critical points @E1_crit are where the curve has a vertical tangent — $E_1$ reaches a turning point as $E_2$ varies. The two solutions give $E_(1,min)$ and $E_(1,max)$. Likewise, @E2_crit gives horizontal tangents where $E_2$ is extremal, yielding $E_(2,min)$ and $E_(2,max)$.
+
+#import "@preview/cetz:0.3.4"
+
+#figure(
+  cetz.canvas(length: 1cm, {
+    import cetz.draw: *
+
+    let w = 7
+    let h = 5
+
+    // axes
+    line((0, 0), (w + 0.6, 0), mark: (end: "stealth", fill: black, scale: 0.5))
+    line((0, 0), (0, h + 0.6), mark: (end: "stealth", fill: black, scale: 0.5))
+    content((w + 0.6, -0.35), $E_1$)
+    content((-0.35, h + 0.6), $E_2$)
+
+    // constraint curve (tilted ellipse)
+    let cx = w / 2
+    let cy = h / 2
+    let a = 2.4
+    let b = 1.4
+    let theta = 30deg
+
+    // points on tilted ellipse: parametric angle t
+    let ellipse-pt(t) = {
+      let ct = calc.cos(t)
+      let st = calc.sin(t)
+      let x = a * ct * calc.cos(theta) - b * st * calc.sin(theta) + cx
+      let y = a * ct * calc.sin(theta) + b * st * calc.cos(theta) + cy
+      (x, y)
+    }
+
+    // find extremal points analytically
+    // dx/dt = 0: tan(t) = -b sin(theta) / (a cos(theta)) → vertical tangent (E1 extrema)
+    // calc.atan2(x, y) in Typst returns atan(y/x)
+    let tv = calc.atan2(a * calc.cos(theta), -b * calc.sin(theta))
+    // dy/dt = 0: tan(t) = -b cos(theta) / (a sin(theta)) → horizontal tangent (E2 extrema)
+    let th = calc.atan2(a * calc.sin(theta), b * calc.cos(theta))
+
+    let e1-max-pt = ellipse-pt(tv)
+    let e1-min-pt = ellipse-pt(tv + 180deg)
+    let e2-max-pt = ellipse-pt(th)
+    let e2-min-pt = ellipse-pt(th + 180deg)
+
+    // draw the ellipse curve
+    let npts = 80
+    let pts = range(npts + 1).map(i => {
+      let t = i / npts * 360deg
+      ellipse-pt(t)
+    })
+    line(..pts, close: true, stroke: 1.2pt + black)
+
+    // projection lines and labels for E1 bounds
+    let dash-style = (dash: "dashed", paint: gray)
+
+    // E1_min
+    line(e1-min-pt, (e1-min-pt.at(0), 0), stroke: dash-style)
+    content((e1-min-pt.at(0), -0.4), $E_(1,min)$, anchor: "north")
+
+    // E1_max
+    line(e1-max-pt, (e1-max-pt.at(0), 0), stroke: dash-style)
+    content((e1-max-pt.at(0), -0.4), $E_(1,max)$, anchor: "north")
+
+    // E2_min
+    line(e2-min-pt, (0, e2-min-pt.at(1)), stroke: dash-style)
+    content((-0.4, e2-min-pt.at(1)), $E_(2,min)$, anchor: "east")
+
+    // E2_max
+    line(e2-max-pt, (0, e2-max-pt.at(1)), stroke: dash-style)
+    content((-0.4, e2-max-pt.at(1)), $E_(2,max)$, anchor: "east")
+
+    // interval brackets on axes
+    let bracket-color = blue
+    line(
+      (e1-min-pt.at(0), -0.05), (e1-max-pt.at(0), -0.05),
+      stroke: 2pt + bracket-color,
+    )
+    line(
+      (-0.05, e2-min-pt.at(1)), (-0.05, e2-max-pt.at(1)),
+      stroke: 2pt + bracket-color,
+    )
+
+    // critical points
+    let dot-radius = 0.08
+
+    // vertical tangent points (∂f/∂E₂ = 0) → E1 extrema
+    circle(e1-min-pt, radius: dot-radius, fill: red, stroke: none)
+    circle(e1-max-pt, radius: dot-radius, fill: red, stroke: none)
+
+    // horizontal tangent points (∂f/∂E₁ = 0) → E2 extrema
+    circle(e2-min-pt, radius: dot-radius, fill: eastern, stroke: none)
+    circle(e2-max-pt, radius: dot-radius, fill: eastern, stroke: none)
+
+    // tangent lines at critical points
+    let tang-len = 1.0
+
+    // vertical tangents at E1 extrema
+    line(
+      (e1-min-pt.at(0), e1-min-pt.at(1) - tang-len),
+      (e1-min-pt.at(0), e1-min-pt.at(1) + tang-len),
+      stroke: (dash: "dotted", paint: red),
+    )
+    line(
+      (e1-max-pt.at(0), e1-max-pt.at(1) - tang-len),
+      (e1-max-pt.at(0), e1-max-pt.at(1) + tang-len),
+      stroke: (dash: "dotted", paint: red),
+    )
+
+    // horizontal tangents at E2 extrema
+    line(
+      (e2-min-pt.at(0) - tang-len, e2-min-pt.at(1)),
+      (e2-min-pt.at(0) + tang-len, e2-min-pt.at(1)),
+      stroke: (dash: "dotted", paint: eastern),
+    )
+    line(
+      (e2-max-pt.at(0) - tang-len, e2-max-pt.at(1)),
+      (e2-max-pt.at(0) + tang-len, e2-max-pt.at(1)),
+      stroke: (dash: "dotted", paint: eastern),
+    )
+
+    // curve label
+    content((cx + a * 0.5 + 0.5, cy + b + 0.4), $f(E_1, E_2) = 0$)
+
+    // legend
+    let lx = w - 1.5
+    let ly = 0.9
+    circle((lx, ly), radius: dot-radius, fill: red, stroke: none)
+    content((lx + 0.15, ly), $partial f \/ partial E_2 = 0$, anchor: "west")
+    circle((lx, ly - 0.5), radius: dot-radius, fill: eastern, stroke: none)
+    content((lx + 0.15, ly - 0.5), $partial f \/ partial E_1 = 0$, anchor: "west")
+  }),
+  caption: [
+    The constraint curve $f = 0$ in the $(E_1, E_2)$ plane. Red dots mark vertical tangents ($partial f \/ partial E_2 = 0$), whose $E_1$ coordinates give $E_(1,min)$ and $E_(1,max)$. Teal dots mark horizontal tangents ($partial f \/ partial E_1 = 0$), whose $E_2$ coordinates give $E_(2,min)$ and $E_(2,max)$. Blue bars on the axes show the projected encounter intervals.
+  ],
+) <encounter_intervals>
+
+= Time Constraint via Kepler's Equation
+
+The preceding sections treated $E_1$ and $E_2$ as independent variables. In reality, both bodies obey Kepler's equation, which couples each eccentric anomaly to a common time $t$.
+
+== Kepler's equation
+
+For each orbit $i$ with mean motion $n_i = 2 pi \/ T_i$ (where $T_i$ is the orbital period) and mean anomaly at epoch $M_(i,0)$:
+
+$ M_i (t) = M_(i,0) + n_i t = E_i - e_i sin E_i $ <kepler>
+
+This implicitly defines $E_i (t)$. At a given time $t$, both eccentric anomalies are determined:
+
+$ E_1 - e_1 sin E_1 = M_(1,0) + n_1 t, quad E_2 - e_2 sin E_2 = M_(2,0) + n_2 t $ <kepler_both>
+
+== Eliminating time
+
+The position on an ellipse is $2 pi$-periodic in $E_i$, so the spacecraft returns to the same point after each full orbit. The set of times at which orbit $i$ passes through eccentric anomaly $E_i in [-pi, pi]$ is:
+
+$ t = (E_i - e_i sin E_i - M_(i,0) + 2 pi k_i) / n_i, quad k_i in ZZ $ <time_set>
+
+For an encounter, both bodies must be at their respective positions *simultaneously*. Equating the two time expressions:
+
+$ (E_1 - e_1 sin E_1 - M_(1,0) + 2 pi k_1) / n_1 = (E_2 - e_2 sin E_2 - M_(2,0) + 2 pi k_2) / n_2 $
+
+Rearranging gives a family of *time-coupling constraints*, one for each integer pair $(k_1, k_2)$:
+
+$ h_(k_1,k_2) (E_1, E_2) := n_2 (E_1 - e_1 sin E_1 - M_(1,0)) - n_1 (E_2 - e_2 sin E_2 - M_(2,0)) + 2 pi (n_2 k_1 - n_1 k_2) = 0 $ <time_constraint>
+
+Each choice of $(k_1, k_2)$ corresponds to a different encounter opportunity (i.e.~orbit $1$ on its $k_1$-th revolution meeting orbit $2$ on its $k_2$-th revolution). Since only the combination $n_2 k_1 - n_1 k_2$ appears, the distinct constraints are parametrised by a single offset:
+
+$ h(E_1, E_2; lambda) := n_2 (E_1 - e_1 sin E_1 - M_(1,0)) - n_1 (E_2 - e_2 sin E_2 - M_(2,0)) + 2 pi lambda = 0 $ <time_constraint_lambda>
+
+where $lambda = n_2 k_1 - n_1 k_2$ ranges over a discrete set. In the $(E_1, E_2)$ plane (with $E_i in [-pi, pi]$), each value of $lambda$ gives a monotone curve from bottom-left to top-right, and these curves are spaced apart by the synodic offset. The full encounter problem is: find $(E_1, E_2)$ satisfying both the distance constraint $f = 0$ (@constraint_C) and $h = 0$ (@time_constraint_lambda) for some admissible $lambda$.
+
+== Enumerating encounter opportunities
+
+Since $E_i$ and $sin E_i$ are $2 pi$-periodic, shifting $k_2$ by $1$ shifts $lambda$ by $-n_1$, which shifts $E_2$ by exactly $2 pi$ — a full orbit. On the torus $E_i in [-pi, pi]$, different $k_2$ values for the same $k_1$ therefore produce the *same* curve. The distinct encounter opportunities are parametrised by $k_1$ alone.
+
+=== Finding the $k_1$ range from a time window
+
+Given a time window $[t_"lo", t_"hi"]$, the spacecraft passes through eccentric anomaly $E_1 in [-pi, pi]$ on its $k_1$-th orbit at time (@time_set):
+
+$ t = (E_1 - e_1 sin E_1 - M_(1,0) + 2 pi k_1) / n_1 $
+
+Since $E_1 - e_1 sin E_1 in [-pi, pi]$, the admissible $k_1$ values satisfy:
+
+$ k_(1,min) = floor((n_1 t_"lo" + M_(1,0) - pi) / (2 pi)), quad k_(1,max) = ceil((n_1 t_"hi" + M_(1,0) + pi) / (2 pi)) $ <k1_range>
+
+=== Choosing $k_2$ for each $k_1$
+
+For each $k_1$, the approximate encounter time is $t approx (-M_(1,0) + 2 pi k_1) \/ n_1$ (at $E_1 approx 0$). The corresponding $k_2$ is simply:
+
+$ k_2 = op("round")((n_2 t + M_(2,0)) / (2 pi)) $ <k2_choice>
+
+This gives $lambda = n_2 k_1 - n_1 k_2$, and each $k_1$ in $[k_(1,min), k_(1,max)]$ is a candidate encounter opportunity that can be refined with Newton's method.
+
+== Gradient of $h$
+
+$ (partial h) / (partial E_1) = n_2 (1 - e_1 cos E_1), quad (partial h) / (partial E_2) = -n_1 (1 - e_2 cos E_2) $ <time_grad>
+
+Note that $1 - e_i cos E_i = r_i \/ a_i > 0$ for elliptic orbits, so $partial h \/ partial E_1 > 0$ and $partial h \/ partial E_2 < 0$ everywhere. The time constraint is therefore a monotone relation between $E_1$ and $E_2$:
+
+$ (dif E_2) / (dif E_1) = (n_2 (1 - e_1 cos E_1)) / (n_1 (1 - e_2 cos E_2)) = (n_2 r_1 \/ a_1) / (n_1 r_2 \/ a_2) > 0 $ <time_slope>
+
+== Newton's method on the combined system
+
+For a given $lambda$, we solve the $2 times 2$ system $(f, h) = bold(0)$ using Newton's method. The Jacobian is:
+
+$ bold(J) = mat(
+  (partial f) / (partial E_1), (partial f) / (partial E_2);
+  (partial h) / (partial E_1), (partial h) / (partial E_2)
+) = mat(
+  g_1, g_2;
+  n_2 (1 - e_1 cos E_1), -n_1 (1 - e_2 cos E_2)
+) $ <time_jacobian>
+
+The Newton step $bold(delta) = (delta E_1, delta E_2)^top$ solves $bold(J) bold(delta) = -(f, h)^top$ via Cramer's rule:
+
+$ Delta = -g_1 n_1 (1 - e_2 cos E_2) - g_2 n_2 (1 - e_1 cos E_1) $
+
+$ delta E_1 = (f n_1 (1 - e_2 cos E_2) + g_2 h) / Delta $ <time_step1>
+
+$ delta E_2 = (-f n_2 (1 - e_1 cos E_1) - g_1 h) / Delta $ <time_step2>
+
+where $g_1$, $g_2$ are the distance-constraint gradient components (@grad1, @grad2). Since $partial h \/ partial E_1 > 0$ and $partial h \/ partial E_2 < 0$ always, the Jacobian is non-singular whenever $(g_1, g_2)$ is not parallel to $(n_2 r_1 \/ a_1, -n_1 r_2 \/ a_2)$.
+
+== Initial guess
+
+For a given $lambda$, pick $E_1^((0))$ as the midpoint of $[E_(1,min), E_(1,max)]$. Compute the corresponding time from @time_set (with $k_1 = 0$):
+
+$ t = (E_1^((0)) - e_1 sin E_1^((0)) - M_(1,0)) / n_1 $
+
+Rearranging the time constraint $h(E_1^((0)), E_2^((0)); lambda) = 0$ (@time_constraint_lambda) for $E_2$'s mean anomaly:
+
+$ M_2^((0)) := E_2^((0)) - e_2 sin E_2^((0)) = M_(2,0) + n_2 t + (2 pi lambda) / n_1 $
+
+Substituting the expression for $t$:
+
+$ M_2^((0)) = M_(2,0) + (n_2) / (n_1) (E_1^((0)) - e_1 sin E_1^((0)) - M_(1,0)) + (2 pi lambda) / n_1 $
+
+Then solve Kepler's equation $E_2^((0)) - e_2 sin E_2^((0)) = M_2^((0))$ (e.g.~by Newton iteration) to obtain $E_2^((0))$. This ensures the initial point lies exactly on the time-constraint curve for the chosen $lambda$.
+
+#figure(
+  placement: none,
+  image("encounter_contours.svg", width: 80%),
+  caption: [
+    The distance constraint $f(E_1, E_2) = 0$ (solid black) and time constraints $h(E_1, E_2; lambda) = 0$ (dashed, coloured by year) for the Voyager 2 — Jupiter system (1970–1990). Each dashed curve corresponds to a different encounter opportunity (synodic period $approx 7$ years). Intersections of the dashed curves with the solid curve are solutions to the full encounter problem.
+  ],
+) <encounter_contours>
 
