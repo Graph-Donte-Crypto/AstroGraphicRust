@@ -37,3 +37,7 @@ harness = false
 [[bench]]
 name = "kepler_hyperbola"
 harness = false
+
+[[bench]]
+name = "atan2_quartic"
+harness = false
