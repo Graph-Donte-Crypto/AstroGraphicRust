@@ -304,7 +304,7 @@ ax.computed_zorder = False
 # Surface
 ax.plot_surface(E1d, E2d, Fz_plot,
                 cmap=cmap, vmin=z_lo, vmax=z_hi,
-                rstride=5, cstride=5,
+                rstride=1, cstride=1,
                 shade=True, alpha=1.0,
                 edgecolor=(0.6, 0.6, 0.7, 0.3), linewidth=0.5, antialiased=True,
                 zorder=0)
