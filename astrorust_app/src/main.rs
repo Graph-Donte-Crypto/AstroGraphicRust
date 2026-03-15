@@ -5,8 +5,9 @@ use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::UnitQuaternion;
 use astrorust_lib::AU_IN_KM;
+use astrorust_lib::angle::{EccAnomaly, HypAnomaly, IntoAnomaly};
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
-use astrorust_lib::encounter::is_encounter_possible;
+use astrorust_lib::encounter::find_encounters;
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
@@ -52,6 +53,42 @@ const DEFAULT_TIME_WARP_INDEX: usize = 11;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
 
+/// Find the planet index whose earliest encounter is soonest after the spacecraft's current anomaly.
+#[allow(non_snake_case)]
+fn first_future_encounter(spacecraft: &Spacecraft, planets: &[Body], t: Time) -> Option<usize> {
+    let current_anomaly = match &spacecraft.trajectory {
+        Trajectory::Elliptic(elliptic) => {
+            let E: EccAnomaly =
+                elliptic.orbit_2d.0.M_from_t(t).into_anomaly(elliptic.orbit_2d.0.e());
+            eprintln!("Current spacecraft E: {}", E.as_rad());
+            E.as_rad()
+        }
+        Trajectory::Hyperbolic(hyperbolic) => {
+            let H: HypAnomaly =
+                hyperbolic.orbit_2d.0.M_from_t(t).into_anomaly(hyperbolic.orbit_2d.0.e());
+            eprintln!("Current spacecraft H: {}", *H);
+            *H
+        }
+    };
+
+    planets
+        .iter()
+        .enumerate()
+        .find(|(_, planet)| {
+            let encounters =
+                find_encounters(&spacecraft.trajectory, &planet.orbit, planet.soi_radius);
+            eprintln!("Planet {} encounters: {encounters:?}", planet.body.name);
+            !encounters.is_empty()
+                && match &spacecraft.trajectory {
+                    Trajectory::Elliptic(_) => true,
+                    Trajectory::Hyperbolic(_) => {
+                        encounters.iter().any(|enc| enc.0 >= current_anomaly)
+                    }
+                }
+        })
+        .map(|(i, _)| i)
+}
+
 fn main() {
     // TODO: remove after migration to newer winit without wayland bug
     unsafe {
@@ -96,6 +133,7 @@ fn main() {
     let started_at = Instant::now();
     let mut previous_frame = Instant::now();
     let mut simulated_seconds = (started_at_date - planets_epoch).as_seconds_f64();
+    let mut t = Time::from_secs(simulated_seconds);
     let mut time_warp_index = DEFAULT_TIME_WARP_INDEX;
 
     config.spacecraft.orbit.M0 = (config.spacecraft.orbit.M0
@@ -111,15 +149,8 @@ fn main() {
         rgb8_to_color(config.spacecraft.color),
         None,
     );
-    spacecraft.encounters = planets
-        .iter()
-        .enumerate()
-        .filter(|(_, planet)| {
-            is_encounter_possible(&spacecraft.trajectory, &planet.orbit, planet.soi_radius)
-        })
-        .map(|(i, _)| i)
-        .collect();
-    dbg!(&spacecraft.encounters);
+    spacecraft.next_encounter = first_future_encounter(&spacecraft, &planets, t);
+    dbg!(&spacecraft.next_encounter);
 
     while window.render_with_camera(&mut camera) {
         for event in window.events().iter() {
@@ -142,7 +173,7 @@ fn main() {
         previous_frame = now;
         let time_warp = TIME_WARP_STEPS[time_warp_index];
         simulated_seconds += real_dt * time_warp as f64;
-        let t = Time::from_secs(simulated_seconds);
+        t = Time::from_secs(simulated_seconds);
         for planet in &mut planets {
             planet.r = planet.orbit.position(t);
             draw_orbit_and_current_position(&mut window, &eye, scale, planet);
@@ -155,7 +186,7 @@ fn main() {
         }
         if spacecraft.planet_idx.is_none()
             && let Some((i, planet)) = spacecraft
-                .encounters
+                .next_encounter
                 .iter()
                 .map(|&i| (i, &planets[i]))
                 .find(|(_, planet)| (planet.r - spacecraft.r).magnitude() <= planet.soi_radius)
@@ -203,15 +234,8 @@ fn main() {
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
-            spacecraft.encounters = planets
-                .iter()
-                .enumerate()
-                .filter(|(_, planet)| {
-                    is_encounter_possible(&spacecraft.trajectory, &planet.orbit, planet.soi_radius)
-                })
-                .map(|(i, _)| i)
-                .collect();
-            dbg!(&spacecraft.encounters);
+            spacecraft.next_encounter = first_future_encounter(&spacecraft, &planets, t);
+            dbg!(&spacecraft.next_encounter);
         };
         draw_orbit_and_current_position_of_spacecraft(
             &mut window,
@@ -370,7 +394,7 @@ fn create_spacecraft(
     let node = window.add_obj(obj_path, mtl_dir, Vector3::new(1.0, 1.0, 1.0));
     let (r, v) = trajectory.position_and_velocity(Time::from_secs(0.0));
 
-    Spacecraft { node, trajectory, points, color, planet_idx, encounters: vec![], r, v }
+    Spacecraft { node, trajectory, points, color, planet_idx, next_encounter: None, r, v }
 }
 
 fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
@@ -391,7 +415,7 @@ struct Spacecraft {
     node: SceneNode,
     planet_idx: Option<usize>,
     trajectory: Trajectory,
-    encounters: Vec<usize>,
+    next_encounter: Option<usize>,
     points: Vec<Point3<f32>>,
     color: Point3<f32>,
     r: Vector3<f64>,
