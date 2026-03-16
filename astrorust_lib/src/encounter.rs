@@ -4,7 +4,7 @@ use crate::trajectory::Trajectory;
 use nalgebra::{Matrix2, Vector2};
 
 /// Coarse filter: heliocentric distance bounds
-pub fn coarse_encounter_interval(
+pub fn coarse_encounter_intervals(
     spacecraft: &Trajectory,
     planet: &Orbit3D<EllipticOrbit>,
     r_soi: f64,
@@ -48,17 +48,17 @@ pub fn find_encounters(
         return Vec::new();
     }
 
-    let ((lo, hi), _) = coarse_encounter_interval(spacecraft, planet, r_soi);
+    let ((lo, hi), _) = coarse_encounter_intervals(spacecraft, planet, r_soi);
     let a1 = spacecraft.a();
     let e1 = spacecraft.e();
     let hyp1 = e1 > 1.0;
-    let a2 = planet.orbit_2d.0.a();
-    let e2 = planet.orbit_2d.0.e();
+    let a2 = planet.a();
+    let e2 = planet.e();
 
-    let b1 = a1.abs() * (1.0 - e1 * e1).abs().sqrt();
-    let b2 = a2 * (1.0 - e2 * e2).sqrt();
+    let b1 = spacecraft.b();
+    let b2 = planet.b();
 
-    let m = scaled_coupling_matrix(spacecraft, planet);
+    let M = scaled_coupling_matrix(spacecraft, planet);
     let r_soi_sq = r_soi * r_soi;
 
     // Initial guess via parabolic interpolation on the coarse interval.
@@ -81,7 +81,7 @@ pub fn find_encounters(
         let ea2 = (q.y / b2).atan2(q.x / a2 + e2);
         let p2 = Vector2::new(ea2.cos() - e2, ea2.sin());
         let r2 = a2 * (1.0 - e2 * ea2.cos());
-        (ea2, r1 * r1 + r2 * r2 - p1.dot(&(m * p2)))
+        (ea2, r1 * r1 + r2 * r2 - p1.dot(&(M * p2)))
     };
     // Parabolic interpolation: given 3 points (x0,f0),(x1,f1),(x2,f2),
     // fit f(x) ≈ ax²+bx+c and return the minimizer x* = -b/(2a).
@@ -114,7 +114,7 @@ pub fn find_encounters(
     let mut results = Vec::new();
     for (ea1_init, ea2_init, _) in &candidates {
         if let Some(result) =
-            newton_minimize(*ea1_init, *ea2_init, a1, e1, a2, e2, &m, r_soi_sq, hyp1)
+            newton_minimize(*ea1_init, *ea2_init, a1, e1, a2, e2, &M, r_soi_sq, hyp1)
         {
             results.push(result);
         }
@@ -142,16 +142,16 @@ pub fn encounter_intervals(
     let a1 = orbit1.a();
     let e1 = orbit1.e();
     let hyp1 = e1 > 1.0;
-    let b1 = a1.abs() * (1.0 - e1 * e1).abs().sqrt();
-    let a2 = orbit2.orbit_2d.0.a();
-    let e2 = orbit2.orbit_2d.0.e();
-    let b2 = a2 * (1.0 - e2 * e2).sqrt();
+    let b1 = orbit1.b();
+    let a2 = orbit2.a();
+    let e2 = orbit2.e();
+    let b2 = orbit2.b();
     let m = scaled_coupling_matrix(orbit1, orbit2);
     let r_soi_sq = r_soi * r_soi;
 
     // Coarse interval gives two symmetric E₁ arcs: [hi_rad, lo_rad] and [-lo_rad, -hi_rad]
     // (acos reverses the inequality, so hi_deg < lo_deg but hi_rad < lo_rad).
-    let ((lo_deg, hi_deg), _) = coarse_encounter_interval(orbit1, orbit2, r_soi);
+    let ((lo_deg, hi_deg), _) = coarse_encounter_intervals(orbit1, orbit2, r_soi);
     let (coarse_lo, coarse_hi) = if hyp1 {
         (lo_deg, hi_deg) // already in raw hyperbolic anomaly units
     } else {
@@ -539,7 +539,7 @@ mod tests {
                 (ea2, f)
             };
 
-            let ((lo, hi), _) = coarse_encounter_interval(&traj, &planet, r_soi);
+            let ((lo, hi), _) = coarse_encounter_intervals(&traj, &planet, r_soi);
 
             // Strategy 1: linear interpolation between endpoints (2 evals per branch)
             let mid = (lo + hi) / 2.0;
@@ -642,7 +642,7 @@ mod tests {
             let r_soi = planet_cfg.soi_radius();
 
             let ((coarse_lo_deg, coarse_hi_deg), _) =
-                coarse_encounter_interval(&traj, &planet, r_soi);
+                coarse_encounter_intervals(&traj, &planet, r_soi);
             // acos reverses the inequality, so coarse_hi_deg > coarse_lo_deg
             // but coarse_hi_rad > coarse_lo_rad (larger angle = larger rad).
             let coarse_min_rad = coarse_lo_deg.to_radians(); // smaller angle
