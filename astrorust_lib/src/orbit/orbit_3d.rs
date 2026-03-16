@@ -3,10 +3,10 @@ use crate::orbit::flat::Orbit2DBuilder;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::flat::hyperbolic::HyperbolicOrbit;
 use crate::state_vectors::StateVectors;
+use crate::time::Time;
 use nalgebra::{Matrix3x2, Vector3};
 use std::f64::consts::TAU;
 use std::ops::Mul;
-use crate::time::Time;
 
 #[derive(Builder, CopyGetters, Debug, Clone, PartialEq)]
 // #[builder(build_fn(validate = "Self::validate"))]
@@ -38,6 +38,18 @@ pub struct Orbit3D<O> {
 }
 
 impl Orbit3D<EllipticOrbit> {
+    pub fn a(&self) -> f64 {
+        self.orbit_2d.0.a()
+    }
+
+    pub fn e(&self) -> f64 {
+        self.orbit_2d.0.e()
+    }
+
+    pub fn b(&self) -> f64 {
+        self.orbit_2d.0.b()
+    }
+
     pub fn periapsis(&self) -> f64 {
         self.orbit_2d.periapsis()
     }
@@ -56,6 +68,18 @@ impl Orbit3D<EllipticOrbit> {
 }
 
 impl Orbit3D<HyperbolicOrbit> {
+    pub fn a(&self) -> f64 {
+        self.orbit_2d.0.a()
+    }
+
+    pub fn e(&self) -> f64 {
+        self.orbit_2d.0.e()
+    }
+
+    pub fn b(&self) -> f64 {
+        self.orbit_2d.0.b()
+    }
+
     pub fn periapsis(&self) -> f64 {
         self.orbit_2d.periapsis()
     }

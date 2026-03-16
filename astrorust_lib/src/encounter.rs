@@ -14,7 +14,6 @@ pub fn coarse_encounter_interval(
     if spacecraft.e() < 1.0 {
         let (lo, hi) =
             (lo.clamp(-1.0, 1.0).acos().to_degrees(), hi.clamp(-1.0, 1.0).acos().to_degrees());
-        dbg!(&(lo, hi));
         ((lo, hi), (-lo, -hi))
     } else {
         let (lo, hi) = (lo.max(1.0).acosh(), hi.acosh());
@@ -25,17 +24,9 @@ pub fn coarse_encounter_interval(
 /// Compute the scaled coupling matrix M = diag(a₁,b₁) · C · diag(a₂,b₂)
 /// where C = 2 Aᵀ B encodes the mutual orientation of the two orbital planes.
 fn scaled_coupling_matrix(orbit1: &Trajectory, orbit2: &Orbit3D<EllipticOrbit>) -> Matrix2<f64> {
-    let c = orbit1.orb_to_ecl().transpose() * orbit2.orb_to_ecl() * 2.0;
-
-    let a1 = orbit1.a();
-    let e1 = orbit1.e();
-    let b1 = a1.abs() * (1.0 - e1 * e1).abs().sqrt();
-
-    let a2 = orbit2.orbit_2d.0.a();
-    let e2 = orbit2.orbit_2d.0.e();
-    let b2 = a2 * (1.0 - e2 * e2).sqrt();
-
-    Matrix2::new(c[(0, 0)] * a1 * a2, c[(0, 1)] * a1 * b2, c[(1, 0)] * b1 * a2, c[(1, 1)] * b1 * b2)
+    let C = orbit1.orb_to_ecl().transpose() * orbit2.orb_to_ecl() * 2.0;
+    let D = Vector2::new(orbit1.a(), orbit1.b()) * Vector2::new(orbit2.a(), orbit2.b()).transpose();
+    C.component_mul(&D)
 }
 
 const MAX_ITER: usize = 50;

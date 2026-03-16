@@ -1,40 +1,53 @@
-#set document(title: "SOI Encounter Derivation")
+#set document(title: "An algorithm for SOI encounter detection on Keplerian orbits")
 #set page(margin: 1cm, numbering: "1")
 #set text(size: 11pt)
 #set heading(numbering: "1.")
 #set math.equation(numbering: "(1)")
+#set math.vec(delim: "[")
 
-= Analytical Derivation of Sphere-of-Influence Encounter Points
+#page(numbering: none)[
+  #v(1fr)
+  #align(center)[
+    #text(size: 20pt, weight: "bold")[An algorithm for SOI encounter detection\ on Keplerian orbits]
+    #v(2em)
+    #text(size: 13pt)[Artur Sinila]
+    #v(0.5em)
+    #text(size: 12pt)[Astro Graphic Rust Research Foundation]
+    #v(1em)
+    #text(size: 11pt)[March 2026]
+  ]
+  #v(1fr)
+]
 
-== Problem Statement
+#page(numbering: none)[
+  #outline()
+]
 
-Given two Keplerian orbits (spacecraft orbit 1, planet orbit 2) in heliocentric ecliptic coordinates, find the anomaly parameters such that the distance between the spacecraft and the planet equals the planet's sphere-of-influence radius $r_"SOI"$. The spacecraft orbit may be elliptic ($e_1 < 1$) or hyperbolic ($e_1 > 1$); the planet orbit is always elliptic.
+#counter(page).update(1)
+
+= Problem Statement
+
+Given two Keplerian orbits (spacecraft orbit 1, planet orbit 2) in heliocentric ecliptic coordinates, find the eccentric anomalies $E_1, E_2$ such that the distance between the spacecraft and the planet equals the planet's sphere-of-influence radius $r_"SOI"$. It is possible that such $E_1, E_2$ don't exist, the algorithm needs to handle this case as well. The spacecraft orbit may be elliptic ($e_1 < 1$) or hyperbolic ($e_1 > 1$); the planet orbit is always elliptic.
 
 $ norm(bold(A) bold(r)_1 (E_1) - bold(B) bold(r)_2 (E_2)) = r_"SOI" $
 
 where $bold(A)$ and $bold(B)$ are known constant $3 times 2$ rotation matrices mapping from orbital-plane 2D coordinates to 3D heliocentric ecliptic coordinates.
 
-== Notation
+We divide this hard problem into two easier ones:
+1. Finding tight *ranges* of $E_1, E_2$ *where* encounters are *geometrically* possible, ignoring real positions of the bodies
+2. Finding precise *values* of $E_1$ and time $t$ *when* the spacecraft *actually* enters sphere-of-influence of the planet
 
-- $a_i$, $b_i$, $e_i$: semi-major axis, semi-minor axis, and eccentricity of orbit $i$ (with $b_i = |a_i| sqrt(|1 - e_i^2|)$)
-  - Elliptic ($e_i < 1$): $a_i > 0$
-  - Hyperbolic ($e_1 > 1$, spacecraft only): $a_1 < 0$
-- $E_i$: eccentric anomaly (elliptic orbit)
-- $H_1$: hyperbolic eccentric anomaly (hyperbolic spacecraft orbit)
-- $bold(A) in RR^(3 times 2)$, $bold(B) in RR^(3 times 2)$: orbital-to-ecliptic rotation matrices with components $A_(j k)$, $B_(j k)$
-- $r_"SOI"$: radius of the planet's sphere of influence
-
-== Position in Orbital Plane
+= Position in Orbital Plane
 
 For an elliptic orbit, the 2D position vector in the orbital plane as a function of eccentric anomaly is:
 
-$ bold(r)_i (E_i) = vec(delim: "[",a_i (cos E_i - e_i), b_i sin E_i) $ <orbital_pos>
+$ bold(r)_i (E_i) = vec(a_i (cos E_i - e_i), b_i sin E_i) $ <orbital_pos>
 
 For a hyperbolic spacecraft orbit:
 
-$ bold(r)_1 (H_1) = vec(delim: "[",a_1 (cosh H_1 - e_1), b_1 sinh H_1) $ <orbital_pos_hyp>
+$ bold(r)_1 (H_1) = vec(a_1 (cosh H_1 - e_1), b_1 sinh H_1) $ <orbital_pos_hyp>
 
-== Distance Constraint
+= Distance Constraint
 
 Square both sides of the constraint:
 
@@ -44,7 +57,7 @@ Expand the left-hand side:
 
 $ bold(r)_1^top bold(A)^top bold(A) bold(r)_1 - 2 bold(r)_1^top bold(A)^top bold(B) bold(r)_2 + bold(r)_2^top bold(B)^top bold(B) bold(r)_2 = r_"SOI"^2 $ <expanded>
 
-=== Orthonormality of $bold(A)$ and $bold(B)$
+== Orthonormality of $bold(A)$ and $bold(B)$
 
 Since $bold(A)$ and $bold(B)$ are $3 times 2$ matrices whose columns are orthonormal (they embed an orthonormal frame from the orbital plane into 3D space):
 
@@ -55,7 +68,7 @@ Therefore the self-terms simplify:
 $ bold(r)_1^top bold(A)^top bold(A) bold(r)_1 = bold(r)_1^top bold(r)_1 = |bold(r)_1|^2 =: r_1^2 $
 $ bold(r)_2^top bold(B)^top bold(B) bold(r)_2 = bold(r)_2^top bold(r)_2 = |bold(r)_2|^2 =: r_2^2 $
 
-=== The coupling matrix $bold(C)$
+== Coupling matrix $bold(C)$
 
 Define the $2 times 2$ matrix:
 
@@ -67,15 +80,81 @@ $ r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 = r_"SOI"^2 $ <constraint_C>
 
 Note: $bold(C)$ is *not* necessarily symmetric — it is a general $2 times 2$ real matrix with $|C_(j k)| <= 2$.
 
-== Newton's Method
+== Scaled coupling matrix $bold(M)$
 
-We seek to minimise $f(E_1, E_2) := r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 - r_"SOI"^2$ using Newton's method. Each iteration solves the $2 times 2$ linear system $bold(H) bold(delta) = -nabla f$ for the step $bold(delta) = (delta E_1, delta E_2)^top$, then updates $E_i <- E_i + delta E_i$.
+The position vector @orbital_pos can be factored as $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$, where $op("diag")(a_i, b_i) := mat(a_i, 0; 0, b_i)$ is a diagonal matrix and $bold(p)_i$ is a dimensionless position-direction vector:
 
-=== Deriving the gradient and Hessian
+$ bold(p)_i = vec(cos E_i - e_i, sin E_i) $ <p_def>
 
-The objective is $f = r_1^2 + r_2^2 - bold(r)_1^top bold(C) bold(r)_2 - r_"SOI"^2$, with $r_"SOI"^2$ constant. We differentiate each part with respect to $E_i$.
+For a hyperbolic spacecraft orbit:
 
-==== Self-terms $r_i^2$
+$ bold(p)_1 = vec(cosh H_1 - e_1, sinh H_1) $
+
+Substituting $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$ into the cross-term and using $(bold(X) bold(p))^top = bold(p)^top bold(X)^top$:
+
+$ bold(r)_1^top bold(C) bold(r)_2
+    = (op("diag")(a_1, b_1) bold(p)_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2
+    = bold(p)_1^top op("diag")(a_1, b_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2 $
+
+Since diagonal matrices are symmetric ($op("diag")(x, y)^top = op("diag")(x, y)$):
+
+$ bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) bold(p)_2 $
+
+We have a chain of five matrices. Applying associativity ($bold(A)(bold(B) bold(C)) = (bold(A) bold(B)) bold(C)$) twice — first to $(bold(p)_1^top dot op("diag")(a_1, b_1)) dot bold(C) = bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))$, then to $(bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))) dot op("diag")(a_2, b_2) = bold(p)_1^top dot ((op("diag")(a_1, b_1) dot bold(C)) dot op("diag")(a_2, b_2))$ — lets us group the three constant middle factors into a single *scaled coupling matrix* $bold(M)$.
+
+$ bold(M) = op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) $
+$ bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top bold(M) bold(p)_2 $
+
+Let's introduce matrix $bold(D)$ and express $bold(M)$ in terms of it ($circle.small$ denotes element-wise product):
+
+$ bold(D) := vec(a_1, b_1) vec(a_2, b_2)^top = mat(a_1 a_2, a_1 b_2; b_1 a_2, b_1 b_2), quad bold(M) := bold(D) circle.small bold(C) $ <M>
+
+= Coarse encounter intervals
+
+We restrict the search to eccentric anomaly values where the spacecraft's heliocentric distance lies between planetary perihelion and aphelion $plus.minus r_"SOI"$.
+
+== Radial overlap condition
+
+An encounter requires the spacecraft distance to lie within:
+
+$ a_2 (1 - e_2) - r_"SOI" <= r_1 <= a_2 (1 + e_2) + r_"SOI" $
+
+*Elliptic spacecraft.* Using $r_1 = a_1 (1 - e_1 cos E_1)$ and solving for $cos E_1$:
+
+$ (a_1 - a_2 (1 + e_2) - r_"SOI") / (a_1 e_1) <= cos E_1 <= (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) $ <coarse_bounds>
+
+Clamping both sides to $[-1, 1]$ and applying $arccos$ (which reverses the inequality) gives two symmetric intervals $[E_"lo", E_"hi"]$ and $[-E_"lo", -E_"hi"]$ in $E_1$. If no valid interval exists (i.e.~the clamped range is empty), no encounter is possible at any $E_1$.
+
+*Hyperbolic spacecraft.* Using $r_1 = a_1 (1 - e_1 cosh H_1)$ and solving for $cosh H_1$ (noting $a_1 e_1 < 0$, so dividing reverses the inequality):
+
+$ (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) <= cosh H_1 <= (a_1 - a_2 (1 + e_2) - r_"SOI") / (a_1 e_1) $ <coarse_bounds_hyp>
+
+Clamping the lower bound to $max(dots, 1)$ (since $cosh H_1 >= 1$) and applying $op("arcosh")$ gives a single symmetric interval $[-H_"hi", -H_"lo"] union [H_"lo", H_"hi"]$. If the clamped range is empty, no encounter is possible.
+
+== Initial guess via parabolic interpolation
+
+For each of the two symmetric $E_1$ intervals, we evaluate $f$ at three points: the endpoints and midpoint. Here $E_2$ is estimated by projecting the spacecraft's 3D position onto the planet's orbital plane and inverting the ellipse parametrisation:
+
+$ E_2 = op("atan2")(q_y \/ b_2, quad q_x \/ a_2 + e_2) $
+
+where $bold(q) = bold(B)^top bold(A) bold(r)_1$ is the projection. This matches the eccentric anomaly that $bold(q)$ would have if it lay on the planet's ellipse. The projection is exact when the orbital planes coincide; for inclined orbits, the out-of-plane component is lost. Numerical evaluation for a Pluto-like target ($i = 17°$, $e_2 = 0.25$) shows the maximum $E_2$ error is under $2°$ for moderate spacecraft eccentricities ($e_1 < 0.5$), but a direct Earth--Pluto near-Hohmann transfer ($e_1 approx 0.95$) reaches $~9°$ at favourable orientations and up to $~63°$ at unfavourable ascending-node orientations. Despite these large worst-case errors, the estimate remains adequate as an initial guess for Newton's method, which converges from any starting point in the correct half of the encounter region.
+
+Given three samples $(x_0, f_0)$, $(x_1, f_1)$, $(x_2, f_2)$, the minimiser of the interpolating quadratic is:
+
+$ E_1^* = x_1 - 1/2 ((x_1 - x_0)^2 (f_1 - f_2) - (x_1 - x_2)^2 (f_1 - f_0)) / ((x_1 - x_0)(f_1 - f_2) - (x_1 - x_2)(f_1 - f_0)) $ <parabolic>
+
+Newton's method is then run from the best initial guess across both branches. If the first branch fails to converge to $f <= r_"SOI"^2$, the second branch is tried.
+
+
+= Finding minimum distance using Newton's Method
+
+We seek to minimise $f(E_1, E_2) := r_1^2 + r_2^2 - bold(p)_1^top bold(M) bold(p)_2 - r_"SOI"^2$ using Newton's method. Each iteration solves the $2 times 2$ linear system $bold(H) bold(delta) = -nabla f$ for the step $bold(delta) = (delta E_1, delta E_2)^top$, then updates $E_i <- E_i + delta E_i$.
+
+== Deriving the gradient and Hessian
+
+We differentiate each term with respect to $E_i$.
+
+=== Self-terms $r_i^2$
 
 Using $r_i = a_i (1 - e_i cos E_i)$:
 
@@ -91,37 +170,15 @@ $ (partial r_1^2) / (partial H_1) = -2 a_1^2 e_1 sinh H_1 (1 - e_1 cosh H_1) $ <
 
 $ (partial^2 r_1^2) / (partial H_1^2) = 2 a_1^2 e_1 (e_1 - cosh H_1 + 2 e_1 sinh^2 H_1) $ <self_hess_hyp>
 
-==== Cross-term $bold(r)_1^top bold(C) bold(r)_2$
-
-The position vector @orbital_pos can be factored as $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$, where $op("diag")(a_i, b_i) := mat(a_i, 0; 0, b_i)$ is a diagonal matrix and $bold(p)_i$ is a dimensionless position-direction vector:
-
-$ bold(p)_i = vec(delim: "[",cos E_i - e_i, sin E_i) $ <p_def>
-
-For a hyperbolic spacecraft orbit: $bold(p)_1 = (cosh H_1 - e_1, sinh H_1)^top$.
-
-Substituting $bold(r)_i = op("diag")(a_i, b_i) bold(p)_i$ into the cross-term and using $(bold(X) bold(p))^top = bold(p)^top bold(X)^top$:
-
-$ bold(r)_1^top bold(C) bold(r)_2
-    = (op("diag")(a_1, b_1) bold(p)_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2
-    = bold(p)_1^top op("diag")(a_1, b_1)^top bold(C) op("diag")(a_2, b_2) bold(p)_2 $
-
-Since diagonal matrices are symmetric ($op("diag")(x, y)^top = op("diag")(x, y)$):
-
-$ bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) bold(p)_2 $
-
-We have a chain of five matrices. Applying associativity ($bold(A)(bold(B) bold(C)) = (bold(A) bold(B)) bold(C)$) twice — first to $(bold(p)_1^top dot op("diag")(a_1, b_1)) dot bold(C) = bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))$, then to $(bold(p)_1^top dot (op("diag")(a_1, b_1) dot bold(C))) dot op("diag")(a_2, b_2) = bold(p)_1^top dot ((op("diag")(a_1, b_1) dot bold(C)) dot op("diag")(a_2, b_2))$ — lets us group the three constant middle factors into a single matrix. We define the *scaled coupling matrix*:
-
-$ bold(M) := op("diag")(a_1, b_1) bold(C) op("diag")(a_2, b_2) = mat(C_(11) a_1 a_2, C_(12) a_1 b_2; C_(21) a_2 b_1, C_(22) b_1 b_2) $ <M>
-
-giving $bold(r)_1^top bold(C) bold(r)_2 = bold(p)_1^top bold(M) bold(p)_2$.
+=== Cross-term $bold(p_1^top) bold(M) bold(p_2)$
 
 Since $bold(M)$ is constant, differentiation acts only on $bold(p)_1$ and $bold(p)_2$. Define the derivative vectors:
 
-$ hat(bold(w))_i := dif bold(p)_i / (dif E_i) = vec(delim: "[",-sin E_i, cos E_i), quad hat(bold(u))_i := vec(delim: "[",cos E_i, sin E_i) $ <vecs>
+$ hat(bold(w))_i := dif bold(p)_i / (dif E_i) = vec(-sin E_i, cos E_i), quad hat(bold(u))_i := vec(cos E_i, sin E_i) $ <vecs>
 
 For a hyperbolic spacecraft orbit:
 
-$ hat(bold(w))_1 := dif bold(p)_1 / (dif H_1) = vec(delim: "[",sinh H_1, cosh H_1), quad hat(bold(u))_1 := vec(delim: "[",cosh H_1, sinh H_1) $ <vecs_hyp>
+$ hat(bold(w))_1 := dif bold(p)_1 / (dif H_1) = vec(sinh H_1, cosh H_1), quad hat(bold(u))_1 := vec(cosh H_1, sinh H_1) $ <vecs_hyp>
 
 To differentiate $bold(p)_1^top bold(M) bold(p)_2$ with respect to $E_1$, note that only $bold(p)_1$ depends on $E_1$. By associativity, $bold(p)_1^top bold(M) bold(p)_2 = bold(p)_1^top (bold(M) bold(p)_2)$, which is a dot product of $bold(p)_1$ with the constant vector $bold(M) bold(p)_2$. The derivative of a dot product with one constant factor is:
 
@@ -140,10 +197,6 @@ For a hyperbolic spacecraft orbit, the sign of the $E_1$ term flips:
 $ (partial^2 (bold(p)_1^top bold(M) bold(p)_2)) / (partial H_1^2) = +hat(bold(u))_1^top bold(M) bold(p)_2 $ <cross_hess_diag_hyp>
 
 $ (partial^2 (bold(p)_1^top bold(M) bold(p)_2)) / (partial E_1 partial E_2) = hat(bold(w))_1^top bold(M) hat(bold(w))_2 $ <cross_hess_off>
-
-==== Combined expressions
-
-Combining $f = r_1^2 + r_2^2 - bold(p)_1^top bold(M) bold(p)_2 - r_"SOI"^2$ using @self_grad with @cross_grad, and @self_hess with @cross_hess_diag and @cross_hess_off:
 
 === Gradient
 
@@ -173,7 +226,7 @@ $ H_(11) = 2 a_1^2 e_1 (e_1 - cosh H_1 + 2 e_1 sinh^2 H_1) - hat(bold(u))_1^top 
 
 $H_(22)$ and $H_(12)$ retain the same form, with the hyperbolic $hat(bold(w))_1$, $hat(bold(u))_1$, $bold(p)_1$.
 
-=== Solving the Newton step
+== Solving the Newton step
 
 The $2 times 2$ system is solved directly via Cramer's rule:
 
@@ -183,43 +236,9 @@ $ delta E_1 = ((partial f) / (partial E_1) H_(22) - (partial f) / (partial E_2) 
 
 All coupling terms are bilinear forms $bold(x)^top bold(M) bold(y)$ with 2D vectors, each requiring 4 multiplies and 3 adds. The five needed dot products ($hat(bold(w))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(w))_2$, $hat(bold(u))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(u))_2$, $hat(bold(w))_1^top bold(M) hat(bold(w))_2$) can share the intermediate products $bold(M) bold(p)_2$, $bold(M) hat(bold(w))_2$, $bold(M) hat(bold(u))_2$ (each a 2D matrix-vector multiply).
 
-== Coarse Encounter Interval
+= Encounter Intervals in $E_1$ and $E_2$
 
-Before running Newton's method, we restrict the search to anomaly values where the spacecraft's heliocentric distance overlaps with the planet's distance range $plus.minus r_"SOI"$.
-
-=== Radial overlap condition
-
-An encounter requires the spacecraft distance to lie within:
-
-$ a_2 (1 - e_2) - r_"SOI" <= r_1 <= a_2 (1 + e_2) + r_"SOI" $
-
-*Elliptic spacecraft.* Using $r_1 = a_1 (1 - e_1 cos E_1)$ and solving for $cos E_1$:
-
-$ (a_1 - a_2 (1 + e_2) - r_"SOI") / (a_1 e_1) <= cos E_1 <= (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) $ <coarse_bounds>
-
-Clamping both sides to $[-1, 1]$ and applying $arccos$ (which reverses the inequality) gives two symmetric intervals $[E_"lo", E_"hi"]$ and $[-E_"lo", -E_"hi"]$ in $E_1$. If no valid interval exists (i.e.~the clamped range is empty), no encounter is possible at any $E_1$.
-
-*Hyperbolic spacecraft.* Using $r_1 = a_1 (1 - e_1 cosh H_1)$ and solving for $cosh H_1$ (noting $a_1 e_1 < 0$, so dividing reverses the inequality):
-
-$ (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) <= cosh H_1 <= (a_1 - a_2 (1 + e_2) - r_"SOI") / (a_1 e_1) $ <coarse_bounds_hyp>
-
-Clamping the lower bound to $max(dots, 1)$ (since $cosh H_1 >= 1$) and applying $op("arcosh")$ gives a single symmetric interval $[-H_"hi", -H_"lo"] union [H_"lo", H_"hi"]$. If the clamped range is empty, no encounter is possible.
-
-=== Initial guess via parabolic interpolation
-
-For each of the two symmetric $E_1$ intervals, we evaluate $f$ at three points: the endpoints and midpoint. Here $E_2$ is estimated by projecting the spacecraft's 3D position onto the planet's orbital plane and inverting the ellipse parametrisation:
-
-$ E_2 = op("atan2")(q_y \/ b_2, quad q_x \/ a_2 + e_2) $
-
-where $bold(q) = bold(B)^top bold(A) bold(r)_1$ is the projection. This matches the eccentric anomaly that $bold(q)$ would have if it lay on the planet's ellipse. The projection is exact when the orbital planes coincide; for inclined orbits, the out-of-plane component is lost. Numerical evaluation for a Pluto-like target ($i = 17°$, $e_2 = 0.25$) shows the maximum $E_2$ error is under $2°$ for moderate spacecraft eccentricities ($e_1 < 0.5$), but a direct Earth--Pluto near-Hohmann transfer ($e_1 approx 0.95$) reaches $~9°$ at favourable orientations and up to $~63°$ at unfavourable ascending-node orientations. Despite these large worst-case errors, the estimate remains adequate as an initial guess for Newton's method, which converges from any starting point in the correct half of the encounter region.
-
-Given three samples $(x_0, f_0)$, $(x_1, f_1)$, $(x_2, f_2)$, the minimiser of the interpolating quadratic is:
-
-$ E_1^* = x_1 - 1/2 ((x_1 - x_0)^2 (f_1 - f_2) - (x_1 - x_2)^2 (f_1 - f_0)) / ((x_1 - x_0)(f_1 - f_2) - (x_1 - x_2)(f_1 - f_0)) $ <parabolic>
-
-Newton's method is then run from the best initial guess across both branches. If the first branch fails to converge to $f <= r_"SOI"^2$, the second branch is tried.
-
-== Encounter Intervals in $E_1$ and $E_2$
+In previous section we've obtained the minima of the distance function $f(E_1, E_2)$. If the minimum is less than $r_"SOI"$, then spacecraft enters SOI of the planet. However, our end goal is to find *where* and *when* does the spacecraft intersect SOI *boundary*. In other words, finding roots of $f(E_1, E_2) = 0$.
 
 The constraint $f(E_1, E_2) = 0$ defines an implicit curve (or set of curves) in the $(E_1, E_2)$ plane. The *encounter interval* $[E_(1,min), E_(1,max)]$ is the projection of this curve onto the $E_1$ axis, and $[E_(2,min), E_(2,max)]$ is the projection onto the $E_2$ axis. For every $E_1$ in the first interval there exists at least one $E_2$ in the second interval such that the distance equals $r_"SOI"$.
 
@@ -366,7 +385,7 @@ The constraint $f(E_1, E_2) = 0$ defines an implicit curve (or set of curves) in
   ],
 ) <encounter_surface>
 
-=== Extrema via Lagrange multipliers
+== Extrema via Lagrange multipliers
 
 Finding the extreme values of $E_2$ subject to $f(E_1, E_2) = 0$ is a constrained optimisation problem. The Lagrangian is:
 
@@ -390,7 +409,7 @@ $ (partial f) / (partial E_2) = 0 $ <E1_crit>
 
 Geometrically, consider the surface $z = f(E_1, E_2)$ over the $(E_1, E_2)$ plane (@encounter_surface). The constraint curve $f = 0$ is the intersection of this surface with the $z = 0$ plane. The $E_2$ extrema of this intersection occur where the curve runs parallel to the $E_1$ axis — at these points, the surface's gradient in the $E_1$ direction is zero along the constraint, giving $partial f \/ partial E_1 = 0$.
 
-=== System for $E_1$ bounds
+== System for $E_1$ bounds
 
 To find $E_(1,min)$ and $E_(1,max)$, solve the $2 times 2$ system:
 
@@ -421,7 +440,7 @@ $ delta E_1 = (f H_(22) - g_2^2) / Delta_1, quad delta E_2 = (f H_(12) - g_1 g_2
 
 Note that at convergence ($g_2 = 0$), the determinant simplifies to $Delta_1 = g_1 H_(22)$.
 
-=== System for $E_2$ bounds
+== System for $E_2$ bounds
 
 To find $E_(2,min)$ and $E_(2,max)$, solve:
 

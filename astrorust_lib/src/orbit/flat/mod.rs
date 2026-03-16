@@ -45,7 +45,9 @@ impl Orbit2DBuilder {
         match self.e {
             Some(e) if e < 0.0 => return Err("Eccentricity must be non-negative".into()),
             Some(e) if e > 1.0 && a > 0.0 => {
-                return Err("Semi-major axis must be < 0 if eccentricity is > 1 (hyperbolic)".into());
+                return Err(
+                    "Semi-major axis must be < 0 if eccentricity is > 1 (hyperbolic)".into()
+                );
             }
             Some(e) if e < 1.0 && a < 0.0 => {
                 return Err("Semi-major axis must be > 0 if eccentricity is < 1 (elliptic)".into());
@@ -63,6 +65,11 @@ impl Orbit2D {
 
     pub fn apoapsis(&self) -> f64 {
         self.a * (1.0 + self.e)
+    }
+
+    /// Semi-minor axis
+    pub fn b(&self) -> f64 {
+        self.a.abs() * self.e_root
     }
 
     pub fn M_from_t(&self, t: Time) -> MeanAnomaly {
