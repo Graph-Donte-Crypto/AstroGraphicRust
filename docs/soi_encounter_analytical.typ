@@ -35,6 +35,10 @@ $ (bold(A) bold(r)_1 - bold(B) bold(r)_2)^top (bold(A) bold(r)_1 - bold(B) bold(
 
 Expand the left-hand side:
 
+$ bold(r)_1^top bold(A)^top bold(A) bold(r)_1 - bold(r)_2^top bold(B)^top bold(A) bold(r)_1 - bold(r)_1^top bold(A)^top bold(B) bold(r)_2 + bold(r)_2^top bold(B)^top bold(B) bold(r)_2 = r_"SOI"^2 $ <expanded_1>
+
+Each term on the left side is a scalar, and transpose of a scalar doesn't change it, and by also applying matrix product transposition property $(bold(Q)bold(W))^top=bold(W)^top bold(Q)^top$, we get the following expression:
+
 $ bold(r)_1^top bold(A)^top bold(A) bold(r)_1 - 2 bold(r)_1^top bold(A)^top bold(B) bold(r)_2 + bold(r)_2^top bold(B)^top bold(B) bold(r)_2 = r_"SOI"^2 $ <expanded>
 
 === Orthonormality of $bold(A)$ and $bold(B)$
