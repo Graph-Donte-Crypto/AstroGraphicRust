@@ -1,11 +1,32 @@
+use crate::angle::{Angle, EccAnomaly, HypAnomaly};
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::orbit_3d::Orbit3D;
+use crate::state_vectors::StateVectors;
 use crate::trajectory::Trajectory;
-use crate::util::solve_quadratic;
+use crate::util::{format_with_thousand_separators, solve_quadratic};
 use nalgebra::{Matrix2, Vector2, Vector3};
 
 const MAX_ITER: usize = 50;
 const TOL: f64 = 1e-12;
+
+/// 3D ecliptic position of the spacecraft at its natural anomaly
+/// (eccentric `E` for elliptic, hyperbolic `H` for hyperbolic).
+fn craft_position(craft: &Trajectory, anomaly: f64) -> Vector3<f64> {
+    match craft {
+        Trajectory::Elliptic(o) => o.position(EccAnomaly::from(Angle::from_rad(anomaly))),
+        Trajectory::Hyperbolic(o) => o.position(HypAnomaly::from(anomaly)),
+    }
+}
+
+/// 3D ecliptic position of an elliptic orbit at eccentric anomaly `E`.
+fn planet_position(planet: &Orbit3D<EllipticOrbit>, E: f64) -> Vector3<f64> {
+    planet.position(EccAnomaly::from(Angle::from_rad(E)))
+}
+
+/// Squared 3D distance between spacecraft and planet at the given anomalies.
+fn distance_sq(craft: &Trajectory, planet: &Orbit3D<EllipticOrbit>, E1: f64, E2: f64) -> f64 {
+    (craft_position(craft, E1) - planet_position(planet, E2)).norm_squared()
+}
 
 /// Compute initial-guess anomalies from radial overlap. `E₁` (or `H₁`) is
 /// taken as the midpoint of the coarse interval where the spacecraft's
@@ -19,7 +40,7 @@ pub fn radial_initial_guesses(
     craft: &Trajectory,
     planet: &Orbit3D<EllipticOrbit>,
     r_soi: f64,
-) -> [(f64, f64); 2] {
+) -> [((f64, f64), (f64, f64)); 2] {
     let lo = -(planet.periapsis() - craft.a() - r_soi) / (craft.a() * craft.e());
     let hi = -(planet.apoapsis() - craft.a() + r_soi) / (craft.a() * craft.e());
     let (lo, hi) = if craft.is_hyperbolic() {
@@ -29,16 +50,13 @@ pub fn radial_initial_guesses(
     };
     let E1_mid = 0.5 * (lo + hi);
     let project_E2 = |E1: f64| -> f64 {
-        let r1_2d = if craft.is_hyperbolic() {
-            Vector2::new(craft.a() * (E1.cosh() - craft.e()), craft.b() * E1.sinh())
-        } else {
-            Vector2::new(craft.a() * (E1.cos() - craft.e()), craft.b() * E1.sin())
-        };
-        let r1_3d = craft.orb_to_ecl() * r1_2d;
-        let q = planet.orb_to_ecl().transpose() * r1_3d;
+        let q = planet.orb_to_ecl().transpose() * craft_position(craft, E1);
         (q.y / planet.b()).atan2(q.x / planet.a() + planet.e())
     };
-    [(E1_mid, project_E2(E1_mid)), (-E1_mid, project_E2(-E1_mid))]
+    // Each branch's valid E1 interval — the positive arc is [lo, hi] and the
+    // negative arc is [−hi, −lo]. Returned alongside the seed so the solver
+    // can bracket E1 to its own branch and avoid basin-hopping into the other.
+    [((E1_mid, project_E2(E1_mid)), (lo, hi)), ((-E1_mid, project_E2(-E1_mid)), (-hi, -lo))]
 }
 
 /// Compute initial-guess anomalies from the mutual line of nodes of the two
@@ -121,50 +139,70 @@ pub fn find_encounters(
         return Vec::new();
     }
 
-    let a1 = spacecraft.a();
-    let e1 = spacecraft.e();
-    let hyp1 = spacecraft.is_hyperbolic();
-    let a2 = planet.a();
-    let e2 = planet.e();
-
-    let M = scaled_coupling_matrix(spacecraft, planet);
+    let M_matrix = scaled_coupling_matrix(spacecraft, planet);
     let r_soi_sq = r_soi * r_soi;
 
-    let f_at = |E1: f64, E2: f64| -> f64 {
-        let (p1, r1) = if hyp1 {
-            let (sh, ch) = (E1.sinh(), E1.cosh());
-            (Vector2::new(ch - e1, sh), a1 * (1.0 - e1 * ch))
-        } else {
-            let (s, c) = E1.sin_cos();
-            (Vector2::new(c - e1, s), a1 * (1.0 - e1 * c))
-        };
-        let p2 = Vector2::new(E2.cos() - e2, E2.sin());
-        let r2 = a2 * (1.0 - e2 * E2.cos());
-        r1 * r1 + r2 * r2 - p1.dot(&(M * p2))
+    let f_at = |E1: f64, E2: f64| distance_sq(spacecraft, planet, E1, E2);
+
+    // Break down f at a given (E1, E2) into its two physical components:
+    //   f = r1² + r2² − 2·r⃗_sc·r⃗_planet
+    //     = (r1 − r2)²                          ← radial mismatch
+    //     + 2·r1·r2·(1 − cos θ)                 ← angular mismatch
+    //   where θ is the 3D angle between r⃗_sc and r⃗_planet.
+    let breakdown = |E1: f64, E2: f64| -> (f64, f64, f64, f64, f64, f64) {
+        let r1_vec = craft_position(spacecraft, E1);
+        let r2_vec = planet_position(planet, E2);
+        let (r1, r2) = (r1_vec.norm(), r2_vec.norm());
+        let cross = 2.0 * r1_vec.dot(&r2_vec);
+        let radial_gap_sq = (r1 - r2).powi(2);
+        let angular_gap_sq = 2.0 * r1 * r2 - cross;
+        let f_total = radial_gap_sq + angular_gap_sq;
+        let theta_deg = (cross / (2.0 * r1 * r2)).clamp(-1.0, 1.0).acos().to_degrees();
+        (r1, r2, radial_gap_sq, angular_gap_sq, f_total, theta_deg)
     };
 
     // Seed Newton with both ±branches of the radial-overlap midpoint guess,
-    // sorted by initial f (best first).
-    let mut candidates: Vec<(f64, f64, f64)> = radial_initial_guesses(spacecraft, planet, r_soi)
-        .iter()
-        .map(|&(E1, E2)| (E1, E2, f_at(E1, E2)))
-        .collect();
+    // sorted by initial f (best first). Each seed carries its branch's valid
+    // E1 interval so the solver can bracket and keep distinct basins distinct.
+    let mut candidates: Vec<(f64, f64, (f64, f64), f64)> =
+        radial_initial_guesses(spacecraft, planet, r_soi)
+            .iter()
+            .map(|&((E1, E2), bounds)| (E1, E2, bounds, f_at(E1, E2)))
+            .collect();
     eprintln!(
         "[find_encounters] r_soi_sq={r_soi_sq:.3e}  raw seeds: {:?}",
-        candidates.iter().map(|c| (c.0, c.1, c.2)).collect::<Vec<_>>()
+        candidates.iter().map(|c| (c.0, c.1, c.2, c.3)).collect::<Vec<_>>()
     );
-    candidates.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+    candidates.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap());
     eprintln!(
         "[find_encounters] sorted seeds (best first): {:?}",
-        candidates.iter().map(|c| (c.0, c.1, c.2)).collect::<Vec<_>>()
+        candidates.iter().map(|c| (c.0, c.1, c.2, c.3)).collect::<Vec<_>>()
     );
 
     let mut results = Vec::new();
-    for (E1_init, E2_init, f_init) in &candidates {
+    for (E1_init, E2_init, bounds, f_init) in &candidates {
+        let (r1, r2, radial_sq, angular_sq, _f, theta_deg) = breakdown(*E1_init, *E2_init);
+        let fmt = format_with_thousand_separators;
+        let one_minus_cos = 1.0 - theta_deg.to_radians().cos();
         eprintln!(
-            "[find_encounters] Newton seed E1={E1_init:.6} E2={E2_init:.6} f_init={f_init:.3e}"
+            "[find_encounters] Newton seed E1={E1_init:.6} E2={E2_init:.6} bounds={bounds:?} f_init={f_init:.3e}"
         );
-        match newton_minimize(*E1_init, *E2_init, a1, e1, a2, e2, &M, r_soi_sq, hyp1) {
+        eprintln!("    r1  = {} km    r2 = {} km", fmt(r1.round() as u64), fmt(r2.round() as u64),);
+        eprintln!("    cosine rule:  f = (r1−r2)²  +  2·r1·r2·(1−cos θ)   [θ = {theta_deg:.4}°]",);
+        eprintln!(
+            "       square term (r1−r2)²              = {} km²  ({:.1}% of f)",
+            fmt(radial_sq.round() as u64),
+            100.0 * radial_sq / f_init,
+        );
+        eprintln!(
+            "       cosine term 2·r1·r2·(1−cos θ)     = {} km²  ({:.1}% of f)\n       \
+                   = 2·r1·r2 [{}] × (1−cos θ) [{:.3e}]",
+            fmt(angular_sq.round() as u64),
+            100.0 * angular_sq / f_init,
+            fmt((2.0 * r1 * r2).round() as u64),
+            one_minus_cos,
+        );
+        match newton_2d(*E1_init, *E2_init, spacecraft, planet, &M_matrix, r_soi_sq, *bounds) {
             Some(result) => {
                 eprintln!("[find_encounters]   -> CONVERGED inside r_soi: {result:?}");
                 results.push(result);
@@ -177,106 +215,123 @@ pub fn find_encounters(
     results
 }
 
-/// Newton's method to minimize f = r₁² + r₂² - p₁ᵀMp₂, returning (E₁, E₂)
-/// if the minimum distance is within r_soi.
-fn newton_minimize(
+/// 2D Levenberg-Marquardt iteration on f(E₁, E₂). Step δ solves
+/// (H + λI)·δ = −∇f where H is the analytic 2×2 Hessian of
+/// f = r₁² + r₂² − p₁ᵀMp₂. λ=0 gives a pure Newton step; when a step
+/// fails to decrease f (singular/indefinite H or poor quadratic model),
+/// λ is raised and the step is re-solved from the same iterate.
+fn newton_2d(
     mut E1: f64,
     mut E2: f64,
-    a1: f64,
-    e1: f64,
-    a2: f64,
-    e2: f64,
+    spacecraft: &Trajectory,
+    planet: &Orbit3D<EllipticOrbit>,
     M: &Matrix2<f64>,
     r_soi_sq: f64,
-    hyp1: bool,
+    e1_bounds: (f64, f64),
 ) -> Option<(f64, f64)> {
-    let mut prev_f = f64::INFINITY;
+    let (a1, e1, a2, e2) = (spacecraft.a(), spacecraft.e(), planet.a(), planet.e());
+    let hyp1 = spacecraft.is_hyperbolic();
+    let (e1_lo, e1_hi) = e1_bounds;
+    let eval_f = |e1v: f64, e2v: f64| distance_sq(spacecraft, planet, e1v, e2v);
+
+    // Levenberg-Marquardt damping. λ=0 → pure Newton. When a step increases f
+    // (Newton model is untrustworthy, typically because H is near-singular or
+    // indefinite), we reject, raise λ, and re-solve (H + λI)δ = −∇f from the
+    // same iterate. As λ → ∞ the step becomes short and aligned with −∇f.
+    let mut lambda = 0.0_f64;
+    let mut f = eval_f(E1, E2);
 
     for i in 0..MAX_ITER {
         let (sin1, cos1, p1, w1, u1, cross_sign) = if hyp1 {
             let (sh, ch) = (E1.sinh(), E1.cosh());
-            (
-                sh,
-                ch,
-                Vector2::new(ch - e1, sh),
-                Vector2::new(sh, ch), // ŵ₁ = (sinh H, cosh H)
-                Vector2::new(ch, sh), // û₁ = (cosh H, sinh H)
-                -1.0_f64,
-            ) // cross-term sign flip
+            (sh, ch, Vector2::new(ch - e1, sh), Vector2::new(sh, ch), Vector2::new(ch, sh), -1.0_f64)
         } else {
             let (s, c) = E1.sin_cos();
-            (
-                s,
-                c,
-                Vector2::new(c - e1, s),
-                Vector2::new(-s, c), // ŵ₁ = (-sin E, cos E)
-                Vector2::new(c, s),  // û₁ = (cos E, sin E)
-                1.0_f64,
-            )
+            (s, c, Vector2::new(c - e1, s), Vector2::new(-s, c), Vector2::new(c, s), 1.0_f64)
         };
         let (sin2, cos2) = E2.sin_cos();
-
         let p2 = Vector2::new(cos2 - e2, sin2);
         let w2 = Vector2::new(-sin2, cos2);
         let u2 = Vector2::new(cos2, sin2);
-
         let M_p2 = M * p2;
         let M_w2 = M * w2;
         let M_u2 = M * u2;
 
-        let r1 = a1 * (1.0 - e1 * cos1);
-        let r2 = a2 * (1.0 - e2 * cos2);
-        let f = r1 * r1 + r2 * r2 - p1.dot(&M_p2);
+        // Gradient.
+        let self_g1 = 2.0 * a1 * a1 * e1 * sin1 * (1.0 - e1 * cos1);
+        let self_g1 = if hyp1 { -self_g1 } else { self_g1 };
+        let self_g2 = 2.0 * a2 * a2 * e2 * sin2 * (1.0 - e2 * cos2);
+        let g1 = self_g1 - w1.dot(&M_p2);
+        let g2 = self_g2 - p1.dot(&M_w2);
 
-        println!("{i:>4}  E1={E1:>20.12}  E2={E2:>20.12}  f={f:>16.2}  d={:>.2}", f.sqrt());
-
-        if f > r_soi_sq && f >= prev_f {
-            return None;
-        }
-        prev_f = f;
-
-        // Gradient
-        let self_grad1 = if hyp1 {
-            -2.0 * a1 * a1 * e1 * sin1 * (1.0 - e1 * cos1)
-        } else {
-            2.0 * a1 * a1 * e1 * sin1 * (1.0 - e1 * cos1)
-        };
-        let self_grad2 = 2.0 * a2 * a2 * e2 * sin2 * (1.0 - e2 * cos2);
-        let f1 = self_grad1 - w1.dot(&M_p2);
-        let f2 = self_grad2 - p1.dot(&M_w2);
-
-        // Hessian
-        let self_hess1 = if hyp1 {
+        // Hessian.
+        let self_h1 = if hyp1 {
             2.0 * a1 * a1 * e1 * (e1 - cos1 + 2.0 * e1 * sin1 * sin1)
         } else {
             2.0 * a1 * a1 * e1 * (cos1 - e1 + 2.0 * e1 * sin1 * sin1)
         };
-        let self_hess2 = 2.0 * a2 * a2 * e2 * (cos2 - e2 + 2.0 * e2 * sin2 * sin2);
-        let h11 = self_hess1 + cross_sign * u1.dot(&M_p2);
-        let h22 = self_hess2 + p1.dot(&M_u2);
+        let self_h2 = 2.0 * a2 * a2 * e2 * (cos2 - e2 + 2.0 * e2 * sin2 * sin2);
+        let h11 = self_h1 + cross_sign * u1.dot(&M_p2);
+        let h22 = self_h2 + p1.dot(&M_u2);
         let h12 = -w1.dot(&M_w2);
 
-        let det = h11 * h22 - h12 * h12;
-        let (dE1, dE2) = if det > TOL && h11 > 0.0 {
-            ((f1 * h22 - f2 * h12) / (-det), (f2 * h11 - f1 * h12) / (-det))
-        } else {
-            let grad_norm_sq = f1 * f1 + f2 * f2;
-            if grad_norm_sq <= f64::EPSILON {
-                return None;
-            }
-            let alpha = f / grad_norm_sq;
-            (-alpha * f1, -alpha * f2)
-        };
+        let d_km = format_with_thousand_separators(f.max(0.0).sqrt().round() as u64);
+        println!(
+            "{i:>4}  E1={E1:>23.16}  E2={E2:>23.16}  f={f:>22.12e}  d={d_km:>16} km  λ={lambda:.2e}"
+        );
 
-        E1 += dE1;
-        E2 += dE2;
-
-        if dE1.abs() < TOL && dE2.abs() < TOL {
+        // Gradient-norm convergence: at a stationary point of f, we're done.
+        if g1.abs() < TOL && g2.abs() < TOL {
             return if f <= r_soi_sq { Some((E1, E2)) } else { None };
+        }
+
+        // Inner LM loop: try (H + λI)δ = −∇f, accept if f decreases, else raise λ.
+        let lambda_base = 1e-6 * h11.abs().max(h22.abs()).max(1.0);
+        let mut accepted = false;
+        let (mut dE1, mut dE2) = (0.0, 0.0);
+        let (mut new_E1, mut new_E2, mut new_f) = (E1, E2, f);
+        for _ in 0..40 {
+            let (dh11, dh22) = (h11 + lambda, h22 + lambda);
+            let det = dh11 * dh22 - h12 * h12;
+            if det.abs() < f64::EPSILON || det <= 0.0 {
+                // Damped Hessian still indefinite/singular — raise λ.
+                lambda = (lambda * 4.0).max(lambda_base);
+                continue;
+            }
+            dE1 = (g1 * dh22 - g2 * h12) / (-det);
+            dE2 = (g2 * dh11 - g1 * h12) / (-det);
+            new_E1 = (E1 + dE1).clamp(e1_lo, e1_hi);
+            new_E2 = E2 + dE2;
+            new_f = eval_f(new_E1, new_E2);
+            if new_f < f {
+                accepted = true;
+                break;
+            }
+            lambda = (lambda * 4.0).max(lambda_base);
+        }
+        if !accepted {
+            // Can't make progress — return current iterate if admissible.
+            return if f <= r_soi_sq { Some((E1, E2)) } else { None };
+        }
+
+        let step_at_tol = dE1.abs() < TOL && dE2.abs() < TOL;
+        // Relative-f stall: decrease is below √eps · f. Handles bound-constrained
+        // minima where ∇f ≠ 0 but the feasible step no longer reduces f.
+        let f_stalled = (f - new_f) <= f.abs() * TOL.sqrt();
+        E1 = new_E1;
+        E2 = new_E2;
+        f = new_f;
+        if step_at_tol || f_stalled {
+            return if f <= r_soi_sq { Some((E1, E2)) } else { None };
+        }
+        // Successful step — relax damping back toward pure Newton.
+        lambda *= 0.25;
+        if lambda < lambda_base * 1e-3 {
+            lambda = 0.0;
         }
     }
 
-    None
+    if f <= r_soi_sq { Some((E1, E2)) } else { None }
 }
 
 /// Compute the scaled coupling matrix M = diag(a₁,b₁) · C · diag(a₂,b₂)
@@ -376,30 +431,12 @@ mod tests {
                 let (a2, e2) = (planet.a(), planet.e());
                 let M = scaled_coupling_matrix(traj, &planet);
 
-                let p1_vec = |E1: f64| -> Vector2<f64> {
-                    if hyp1 {
-                        Vector2::new(E1.cosh() - e1, E1.sinh())
-                    } else {
-                        Vector2::new(E1.cos() - e1, E1.sin())
-                    }
-                };
-                let r1_scalar = |E1: f64| -> f64 {
-                    if hyp1 { a1 * (1.0 - e1 * E1.cosh()) } else { a1 * (1.0 - e1 * E1.cos()) }
-                };
-
                 // Absolute 3D distance at a given (E₁/H₁, E₂).
-                let distance = |E1: f64, E2: f64| -> f64 {
-                    let (s2, c2) = E2.sin_cos();
-                    let p1 = p1_vec(E1);
-                    let p2 = Vector2::new(c2 - e2, s2);
-                    let r1 = r1_scalar(E1);
-                    let r2 = a2 * (1.0 - e2 * c2);
-                    (r1 * r1 + r2 * r2 - p1.dot(&(M * p2))).max(0.0).sqrt()
-                };
+                let distance = |E1: f64, E2: f64| distance_sq(traj, &planet, E1, E2).sqrt();
 
                 // --- Midpoint guess: better of the two ±branches ---
                 let mut best_mid = (f64::NAN, f64::NAN, f64::INFINITY);
-                for (E1, E2) in radial_initial_guesses(traj, &planet, r_soi) {
+                for ((E1, E2), _bounds) in radial_initial_guesses(traj, &planet, r_soi) {
                     let d = distance(E1, E2);
                     if d < best_mid.2 {
                         best_mid = (E1, E2, d);
