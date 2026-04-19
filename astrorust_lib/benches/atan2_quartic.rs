@@ -55,6 +55,69 @@ fn atan2_projection(ea1: f64, a1: f64, e1: f64, b1: f64, a2: f64, e2: f64, b2: f
     (q.y / b2).atan2(q.x / a2 + e2)
 }
 
+/// Ray-intersection atan2: find the point where the Sun-ray through the
+/// projected spacecraft position hits the planet's ellipse, then invert
+/// the ellipse parametrization at that point.
+///
+/// Geometrically, this E₂ places the planet on the same ray from the Sun
+/// as the projected spacecraft, zeroing the tangential separation component.
+fn ray_intersect_estimate(
+    ea1: f64,
+    a1: f64,
+    e1: f64,
+    b1: f64,
+    a2: f64,
+    e2: f64,
+    b2: f64,
+    mat_a: &Matrix3x2<f64>,
+    mat_b: &Matrix3x2<f64>,
+) -> f64 {
+    let r1_2d = Vector2::new(a1 * (ea1.cos() - e1), b1 * ea1.sin());
+    let r1_3d = mat_a * r1_2d;
+    let q = mat_b.transpose() * r1_3d;
+    // Solve α·s² + 2β·s + γ = 0 for s, pick the positive root.
+    let alpha = (q.x / a2).powi(2) + (q.y / b2).powi(2);
+    let beta = q.x * e2 / a2;
+    let gamma = e2 * e2 - 1.0;
+    let disc = (beta * beta - alpha * gamma).max(0.0).sqrt();
+    let s_plus = (-beta + disc) / alpha;
+    let s_minus = (-beta - disc) / alpha;
+    // Pick the ellipse intersection closest to q (|s − 1| smallest).
+    let s = if (s_plus - 1.0).abs() < (s_minus - 1.0).abs() { s_plus } else { s_minus };
+    (s * q.y / b2).atan2(s * q.x / a2 + e2)
+}
+
+/// Closed-form E₂ from dropping the CC·sin(2E₂) harmonic in ∂f/∂E₂ = 0.
+///
+/// The trig equation ∂f/∂E₂ = 0 is
+///   AA·sin E₂ − (CC/2)·sin(2E₂) − BB·cos E₂ = 0
+/// with AA = 2a₂²e₂ + v_x, BB = v_y, CC = 2a₂²e₂², v = Mᵀ·p₁.
+/// Dropping the O(e₂²) harmonic leaves AA·sin E₂ − BB·cos E₂ = 0,
+/// whose solution is E₂ = atan2(BB, AA). Equivalent to the quartic
+/// factored at CC = 0:  BB·t⁴ + 2AA·t³ + 2AA·t − BB
+///                    = (t² + 1)(BB·t² + 2AA·t − BB).
+/// Since t² + 1 has no real roots, the quartic collapses to a quadratic.
+///
+/// Picks the critical point with H₂₂ > 0 (local minimum, not maximum).
+fn first_order_e2_estimate(ea1: f64, e1: f64, a2: f64, e2: f64, m: &Matrix2<f64>) -> f64 {
+    let p1 = Vector2::new(ea1.cos() - e1, ea1.sin());
+    let v = m.transpose() * p1;
+    let aa = 2.0 * a2 * a2 * e2 + v.x;
+    let bb = v.y;
+    let ea2 = bb.atan2(aa);
+    let (sin2, cos2) = ea2.sin_cos();
+    let u2 = Vector2::new(cos2, sin2);
+    let h22 = 2.0 * a2 * a2 * e2 * (cos2 - e2 + 2.0 * e2 * sin2 * sin2)
+        + p1.dot(&(m * u2));
+    if h22 > 0.0 {
+        ea2
+    } else if ea2 > 0.0 {
+        ea2 - PI
+    } else {
+        ea2 + PI
+    }
+}
+
 /// E₂ estimate from df/dE₂ = 0 with e₂ ≈ 0: just p₁ᵀ M ŵ₂ = 0.
 ///
 /// Gives E₂ = atan2(v₂, v₁) where v = Mᵀ p₁.
@@ -73,6 +136,142 @@ fn cross_term_estimate(ea1: f64, e1: f64, m: &Matrix2<f64>) -> f64 {
         // Flip to opposite quadrant
         if ea2 > 0.0 { ea2 - PI } else { ea2 + PI }
     }
+}
+
+/// 2D Newton on f(E₁, E₂) starting from a seed (ea1, ea2). Mirrors the
+/// `newton_minimize` routine in `encounter.rs` so the benchmark measures
+/// "initial guess + real encounter solve" end-to-end.
+fn newton_2d(
+    mut ea1: f64,
+    mut ea2: f64,
+    a1: f64,
+    e1: f64,
+    a2: f64,
+    e2: f64,
+    m: &Matrix2<f64>,
+) -> (f64, f64) {
+    const MAX_ITER: usize = 50;
+    const TOL: f64 = 1e-12;
+    for _ in 0..MAX_ITER {
+        let (s1, c1) = ea1.sin_cos();
+        let (s2, c2) = ea2.sin_cos();
+        let p1 = Vector2::new(c1 - e1, s1);
+        let p2 = Vector2::new(c2 - e2, s2);
+        let w1 = Vector2::new(-s1, c1);
+        let w2 = Vector2::new(-s2, c2);
+        let u1 = Vector2::new(c1, s1);
+        let u2 = Vector2::new(c2, s2);
+        let m_p2 = m * p2;
+        let m_w2 = m * w2;
+        let m_u2 = m * u2;
+        let g1 = 2.0 * a1 * a1 * e1 * s1 * (1.0 - e1 * c1) - w1.dot(&m_p2);
+        let g2 = 2.0 * a2 * a2 * e2 * s2 * (1.0 - e2 * c2) - p1.dot(&m_w2);
+        let h11 = 2.0 * a1 * a1 * e1 * (c1 - e1 + 2.0 * e1 * s1 * s1) + u1.dot(&m_p2);
+        let h22 = 2.0 * a2 * a2 * e2 * (c2 - e2 + 2.0 * e2 * s2 * s2) + p1.dot(&m_u2);
+        let h12 = -w1.dot(&m_w2);
+        let det = h11 * h22 - h12 * h12;
+        if det.abs() < f64::EPSILON {
+            break;
+        }
+        let d_e1 = (g1 * h22 - g2 * h12) / (-det);
+        let d_e2 = (g2 * h11 - g1 * h12) / (-det);
+        ea1 += d_e1;
+        ea2 += d_e2;
+        if d_e1.abs() < TOL && d_e2.abs() < TOL {
+            break;
+        }
+    }
+    (ea1, ea2)
+}
+
+/// 2D Halley iteration on f(E₁, E₂). Third-order convergence:
+/// starting from Newton direction δ_N = −H⁻¹∇f, the Halley step is
+///   δ_H = −(H + ½ T[δ_N])⁻¹ ∇f
+/// where T[δ_N] is the third-derivative tensor contracted with δ_N (a 2×2 matrix).
+///
+/// Third derivatives for f = r₁² + r₂² − p₁ᵀMp₂:
+///   A3 = ∂³f/∂E₁³       = d³(r₁²)/dE₁³ + ŵ₁ᵀ M p₂
+///   B3 = ∂³f/∂E₁² ∂E₂   =               û₁ᵀ M ŵ₂
+///   C3 = ∂³f/∂E₁ ∂E₂²   =               ŵ₁ᵀ M û₂
+///   D3 = ∂³f/∂E₂³       = d³(r₂²)/dE₂³ + p₁ᵀ M ŵ₂
+///   d³(rᵢ²)/dEᵢ³ = −2aᵢ²eᵢ sin Eᵢ + 4aᵢ²eᵢ² sin(2Eᵢ)
+fn halley_2d(
+    mut ea1: f64,
+    mut ea2: f64,
+    a1: f64,
+    e1: f64,
+    a2: f64,
+    e2: f64,
+    m: &Matrix2<f64>,
+) -> (f64, f64) {
+    const MAX_ITER: usize = 50;
+    const TOL: f64 = 1e-12;
+    for _ in 0..MAX_ITER {
+        let (s1, c1) = ea1.sin_cos();
+        let (s2, c2) = ea2.sin_cos();
+        let p1 = Vector2::new(c1 - e1, s1);
+        let p2 = Vector2::new(c2 - e2, s2);
+        let w1 = Vector2::new(-s1, c1);
+        let w2 = Vector2::new(-s2, c2);
+        let u1 = Vector2::new(c1, s1);
+        let u2 = Vector2::new(c2, s2);
+        let m_p2 = m * p2;
+        let m_w2 = m * w2;
+        let m_u2 = m * u2;
+
+        // Gradient
+        let g1 = 2.0 * a1 * a1 * e1 * s1 * (1.0 - e1 * c1) - w1.dot(&m_p2);
+        let g2 = 2.0 * a2 * a2 * e2 * s2 * (1.0 - e2 * c2) - p1.dot(&m_w2);
+
+        // Hessian
+        let h11 = 2.0 * a1 * a1 * e1 * (c1 - e1 + 2.0 * e1 * s1 * s1) + u1.dot(&m_p2);
+        let h22 = 2.0 * a2 * a2 * e2 * (c2 - e2 + 2.0 * e2 * s2 * s2) + p1.dot(&m_u2);
+        let h12 = -w1.dot(&m_w2);
+        let det = h11 * h22 - h12 * h12;
+        if det.abs() < f64::EPSILON {
+            break;
+        }
+
+        // Newton direction first (for contracting the 3rd-derivative tensor)
+        let dn1 = (g1 * h22 - g2 * h12) / (-det);
+        let dn2 = (g2 * h11 - g1 * h12) / (-det);
+
+        // Third derivatives
+        let d3_r1sq = -2.0 * a1 * a1 * e1 * s1 + 8.0 * a1 * a1 * e1 * e1 * s1 * c1;
+        let d3_r2sq = -2.0 * a2 * a2 * e2 * s2 + 8.0 * a2 * a2 * e2 * e2 * s2 * c2;
+        let a3 = d3_r1sq + w1.dot(&m_p2);
+        let b3 = u1.dot(&m_w2);
+        let c3 = w1.dot(&m_u2);
+        let d3 = d3_r2sq + p1.dot(&m_w2);
+
+        // T[δ_N] — symmetric 2×2
+        let t11 = dn1 * a3 + dn2 * b3;
+        let t12 = dn1 * b3 + dn2 * c3;
+        let t22 = dn1 * c3 + dn2 * d3;
+
+        // Halley's modified Hessian: H + ½ T[δ_N]
+        let hh11 = h11 + 0.5 * t11;
+        let hh12 = h12 + 0.5 * t12;
+        let hh22 = h22 + 0.5 * t22;
+        let det_h = hh11 * hh22 - hh12 * hh12;
+        if det_h.abs() < f64::EPSILON {
+            // Fall back to Newton step if Halley is singular.
+            ea1 += dn1;
+            ea2 += dn2;
+            if dn1.abs() < TOL && dn2.abs() < TOL {
+                break;
+            }
+            continue;
+        }
+        let d_e1 = (g1 * hh22 - g2 * hh12) / (-det_h);
+        let d_e2 = (g2 * hh11 - g1 * hh12) / (-det_h);
+        ea1 += d_e1;
+        ea2 += d_e2;
+        if d_e1.abs() < TOL && d_e2.abs() < TOL {
+            break;
+        }
+    }
+    (ea1, ea2)
 }
 
 /// Refine the atan2 projection estimate with Newton iterations on df/dE₂ = 0.
@@ -448,12 +647,32 @@ fn bench_encounter(c: &mut Criterion) {
 
             let mut ei = 0usize;
 
+            // Each variant: compute initial E₂ guess, then run full 2D Newton on
+            // f(E₁, E₂) to convergence. Timing reflects the total cost of reaching
+            // the encounter (initial guess + Newton iterations), matching the
+            // "find_encounters" algorithm in encounter.rs.
             group.bench_function(format!("atan2/{}", case.label), |b| {
                 b.iter(|| {
                     let ea1 = e1s[ei % n];
                     ei = ei.wrapping_add(1);
-                    criterion::black_box(atan2_projection(
+                    let ea2 = atan2_projection(
                         ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
+                    );
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
+                    ))
+                });
+            });
+
+            group.bench_function(format!("atan2_halley/{}", case.label), |b| {
+                b.iter(|| {
+                    let ea1 = e1s[ei % n];
+                    ei = ei.wrapping_add(1);
+                    let ea2 = atan2_projection(
+                        ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
+                    );
+                    criterion::black_box(halley_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
                     ))
                 });
             });
@@ -462,26 +681,52 @@ fn bench_encounter(c: &mut Criterion) {
                 b.iter(|| {
                     let ea1 = e1s[ei % n];
                     ei = ei.wrapping_add(1);
-                    criterion::black_box(cross_term_estimate(
-                        ea1, case.e1, &m,
+                    let ea2 = cross_term_estimate(ea1, case.e1, &m);
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
                     ))
                 });
             });
 
-            for niter in [1, 2, 3] {
-                group.bench_function(format!("newton{niter}/{}", case.label), |b| {
-                    b.iter(|| {
-                        let ea1 = e1s[ei % n];
-                        ei = ei.wrapping_add(1);
-                        let ea2_hint = atan2_projection(
-                            ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
-                        );
-                        criterion::black_box(newton_estimate(
-                            ea1, ea2_hint, case.a1, case.e1, case.a2, case.e2, &m, niter,
-                        ))
-                    });
+            group.bench_function(format!("ray_intersect/{}", case.label), |b| {
+                b.iter(|| {
+                    let ea1 = e1s[ei % n];
+                    ei = ei.wrapping_add(1);
+                    let ea2 = ray_intersect_estimate(
+                        ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
+                    );
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
+                    ))
                 });
-            }
+            });
+
+            group.bench_function(format!("first_order_e2/{}", case.label), |b| {
+                b.iter(|| {
+                    let ea1 = e1s[ei % n];
+                    ei = ei.wrapping_add(1);
+                    let ea2 = first_order_e2_estimate(ea1, case.e1, case.a2, case.e2, &m);
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
+                    ))
+                });
+            });
+
+            group.bench_function(format!("newton1/{}", case.label), |b| {
+                b.iter(|| {
+                    let ea1 = e1s[ei % n];
+                    ei = ei.wrapping_add(1);
+                    let ea2_hint = atan2_projection(
+                        ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
+                    );
+                    let ea2 = newton_estimate(
+                        ea1, ea2_hint, case.a1, case.e1, case.a2, case.e2, &m, 1,
+                    );
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
+                    ))
+                });
+            });
 
             group.bench_function(format!("quartic/{}", case.label), |b| {
                 b.iter(|| {
@@ -490,8 +735,11 @@ fn bench_encounter(c: &mut Criterion) {
                     let ea2_hint = atan2_projection(
                         ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b,
                     );
-                    criterion::black_box(quartic_estimate(
+                    let ea2 = quartic_estimate(
                         ea1, ea2_hint, case.a1, case.e1, case.a2, case.e2, &m, r_soi_sq,
+                    );
+                    criterion::black_box(newton_2d(
+                        ea1, ea2, case.a1, case.e1, case.a2, case.e2, &m,
                     ))
                 });
             });
@@ -502,8 +750,9 @@ fn bench_encounter(c: &mut Criterion) {
 
     // Print full accuracy comparison against ground truth (golden-section minimizer)
     println!("\n=== Varying eccentricity (Pluto i=17°) ===");
-    println!("{:>12}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}", "case", "proj°", "cross°", "N1°", "N2°", "N3°", "qrt°");
-    println!("{}", "-".repeat(70));
+    println!("{:>12}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}  {:>8}",
+             "case", "proj°", "ray°", "cross°", "1ste2°", "N1°", "qrt°");
+    println!("{}", "-".repeat(72));
 
     for case in &cases {
         let inc2 = case.inc2_deg.to_radians();
@@ -515,8 +764,10 @@ fn bench_encounter(c: &mut Criterion) {
         let r_soi_sq = case.r_soi * case.r_soi;
 
         let mut max_err_proj = 0.0_f64;
+        let mut max_err_ray = 0.0_f64;
         let mut max_err_cross = 0.0_f64;
-        let mut max_err_n = [0.0_f64; 3];
+        let mut max_err_1ste2 = 0.0_f64;
+        let mut max_err_n1 = 0.0_f64;
         let mut max_err_qrt = 0.0_f64;
 
         for &ea1 in &e1s {
@@ -525,28 +776,28 @@ fn bench_encounter(c: &mut Criterion) {
             });
 
             let ea2_proj = atan2_projection(ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b);
+            let ea2_ray = ray_intersect_estimate(ea1, case.a1, case.e1, b1, case.a2, case.e2, b2, &mat_a, &mat_b);
             let ea2_cross = cross_term_estimate(ea1, case.e1, &m);
+            let ea2_1ste2 = first_order_e2_estimate(ea1, case.e1, case.a2, case.e2, &m);
             let ea2_qrt = quartic_estimate(ea1, ea2_proj, case.a1, case.e1, case.a2, case.e2, &m, r_soi_sq);
+            let ea2_n1 = newton_estimate(ea1, ea2_cross, case.a1, case.e1, case.a2, case.e2, &m, 1);
 
             max_err_proj = max_err_proj.max(angle_error(ea2_proj, ea2_true));
+            max_err_ray = max_err_ray.max(angle_error(ea2_ray, ea2_true));
             max_err_cross = max_err_cross.max(angle_error(ea2_cross, ea2_true));
+            max_err_1ste2 = max_err_1ste2.max(angle_error(ea2_1ste2, ea2_true));
+            max_err_n1 = max_err_n1.max(angle_error(ea2_n1, ea2_true));
             max_err_qrt = max_err_qrt.max(angle_error(ea2_qrt, ea2_true));
-
-            // Newton starting from cross-term estimate
-            for niter in 0..3 {
-                let ea2_n = newton_estimate(ea1, ea2_cross, case.a1, case.e1, case.a2, case.e2, &m, niter + 1);
-                max_err_n[niter] = max_err_n[niter].max(angle_error(ea2_n, ea2_true));
-            }
         }
 
         println!(
-            "{:>12}  {:>8.2}  {:>8.2}  {:>8.4}  {:>8.4}  {:>8.4}  {:>8.4}",
+            "{:>12}  {:>8.2}  {:>8.2}  {:>8.2}  {:>8.2}  {:>8.4}  {:>8.4}",
             case.label,
             max_err_proj.to_degrees(),
+            max_err_ray.to_degrees(),
             max_err_cross.to_degrees(),
-            max_err_n[0].to_degrees(),
-            max_err_n[1].to_degrees(),
-            max_err_n[2].to_degrees(),
+            max_err_1ste2.to_degrees(),
+            max_err_n1.to_degrees(),
             max_err_qrt.to_degrees(),
         );
     }

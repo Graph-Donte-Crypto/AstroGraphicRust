@@ -14,6 +14,10 @@ pub enum Trajectory {
 }
 
 impl Trajectory {
+    pub fn is_hyperbolic(&self) -> bool {
+        matches!(self, Self::Hyperbolic(_))
+    }
+
     pub fn periapsis(&self) -> f64 {
         match self {
             Trajectory::Elliptic(orbit3_d) => orbit3_d.periapsis(),

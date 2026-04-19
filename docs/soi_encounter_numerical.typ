@@ -1,4 +1,4 @@
-#set document(title: "An algorithm for SOI encounter detection on Keplerian orbits")
+#set document(title: "An algorithm for SOI encounter computation on Keplerian orbits")
 #set page(margin: 1cm, numbering: "1")
 #set text(size: 11pt)
 #set heading(numbering: "1.")
@@ -8,7 +8,7 @@
 #page(numbering: none)[
   #v(1fr)
   #align(center)[
-    #text(size: 20pt, weight: "bold")[An algorithm for SOI encounter detection\ on Keplerian orbits]
+    #text(size: 20pt, weight: "bold")[An algorithm for SOI encounter computation\ on Keplerian orbits]
     #v(2em)
     #text(size: 13pt)[Artur Sinila]
     #v(0.5em)
@@ -131,26 +131,121 @@ $ (a_1 - a_2 (1 - e_2) + r_"SOI") / (a_1 e_1) <= cosh H_1 <= (a_1 - a_2 (1 + e_2
 
 Clamping the lower bound to $max(dots, 1)$ (since $cosh H_1 >= 1$) and applying $op("arcosh")$ gives a single symmetric interval $[-H_"hi", -H_"lo"] union [H_"lo", H_"hi"]$. If the clamped range is empty, no encounter is possible.
 
-== Initial guess via parabolic interpolation
+== Initial guess via midpoint and atan2 projection <sec_atan2_guess>
 
-For each of the two symmetric $E_1$ intervals, we evaluate $f$ at three points: the endpoints and midpoint. Here $E_2$ is estimated by projecting the spacecraft's 3D position onto the planet's orbital plane and inverting the ellipse parametrisation:
+Newton's method (@sec_newton) converges rapidly once seeded near a local minimum of $f$. We produce the seed in two cheap steps: take the midpoint of the radial-overlap interval as $E_1^*$, then estimate the matching $E_2^*$ via a closed-form atan2 projection.
 
-$ E_2 = op("atan2")(q_y \/ b_2, quad q_x \/ a_2 + e_2) $
+=== Selecting $E_1^*$ as the interval midpoint
 
-where $bold(q) = bold(B)^top bold(A) bold(r)_1$ is the projection. This matches the eccentric anomaly that $bold(q)$ would have if it lay on the planet's ellipse. The projection is exact when the orbital planes coincide; for inclined orbits, the out-of-plane component is lost. Numerical evaluation for a Pluto-like target ($i = 17°$, $e_2 = 0.25$) shows the maximum $E_2$ error is under $2°$ for moderate spacecraft eccentricities ($e_1 < 0.5$), but a direct Earth--Pluto near-Hohmann transfer ($e_1 approx 0.95$) reaches $~9°$ at favourable orientations and up to $~63°$ at unfavourable ascending-node orientations. Despite these large worst-case errors, the estimate remains adequate as an initial guess for Newton's method, which converges from any starting point in the correct half of the encounter region.
+The radial-overlap condition @coarse_bounds produces the symmetric intervals $[E_"lo", E_"hi"]$ and $[-E_"hi", -E_"lo"]$. For each branch we seed Newton's method at the midpoint:
 
-Given three samples $(x_0, f_0)$, $(x_1, f_1)$, $(x_2, f_2)$, the minimiser of the interpolating quadratic is:
+$ E_1^* = (E_"lo" + E_"hi") \/ 2 $ <midpoint>
 
-$ E_1^* = x_1 - 1/2 ((x_1 - x_0)^2 (f_1 - f_2) - (x_1 - x_2)^2 (f_1 - f_0)) / ((x_1 - x_0)(f_1 - f_2) - (x_1 - x_2)(f_1 - f_0)) $ <parabolic>
+No $f$ evaluations are spent on the seed itself — the interval from the radial-overlap condition already brackets the region where encounters are geometrically possible, and its midpoint is within half the interval width of the true minimum. Newton's quadratic convergence absorbs the residual in a handful of iterations.
 
-Newton's method is then run from the best initial guess across both branches. If the first branch fails to converge to $f <= r_"SOI"^2$, the second branch is tried.
+=== Estimating $E_2$ from $E_1$ via atan2 projection <atan2_section>
+
+Given $E_1^*$, the spacecraft's position in the ecliptic frame is $bold(A) bold(r)_1 (E_1^*)$. Project it onto the planet's orbital plane and express the result in the planet's 2D coordinates:
+
+$ bold(q) := bold(B)^top bold(A) bold(r)_1 (E_1^*) $ <proj_q>
+
+We now want an $E_2$ such that $bold(r)_2 (E_2)$ is as close as possible to $bold(q)$. Finding the *exact* closest-point-on-ellipse has no closed form below degree 4 (@sec_nodal_guess notes the same quartic structure), so we look for a cheap approximation derived from the ellipse's natural parametrisation.
+
+==== Deriving atan2 projection from an affine transformation
+
+The ellipse has Sun (focus) at the origin and *centre* at $(-a_2 e_2, 0)$, with equation
+$ (x + a_2 e_2)^2 \/ a_2^2 + y^2 \/ b_2^2 = 1. $
+
+Define the affine map
+$ T : (x, y) |-> (x \/ a_2 + e_2, quad y \/ b_2). $ <T_def>
+
+$T$ shifts the ellipse centre onto the new origin (via $+ a_2 e_2$ in $x$ after the $1\/a_2$ scaling) and rescales both axes so the ellipse equation becomes
+$ x'^2 + y'^2 = 1, $
+a *unit circle centred at the new origin*. The Sun, which was at the original origin, is carried by $T$ to $(e_2, 0)$ in the new frame — it is no longer at the origin.
+
+The parametrisation maps particularly cleanly. Applying $T$ to $bold(r)_2 (E_2) = (a_2 (cos E_2 - e_2), #h(0.2em) b_2 sin E_2)$:
+$ T(bold(r)_2 (E_2)) = (cos E_2, quad sin E_2). $
+
+So in the $T$-frame, $E_2$ is exactly the angular coordinate on the unit circle measured from its centre (which is also the new origin). This is the geometric meaning of eccentric anomaly, hiding in plain sight in the parametrisation.
+
+Closest-point-on-unit-circle is now a genuinely solvable problem. Let $(p_x, p_y) := T(bold(q)) = (q_x \/ a_2 + e_2, #h(0.2em) q_y \/ b_2)$. A point on the unit circle is parametrised by $E_2$ as $(cos E_2, sin E_2)$. We seek the $E_2$ minimising
+
+$ D^2 (E_2) := (cos E_2 - p_x)^2 + (sin E_2 - p_y)^2 $
+
+Differentiating:
+
+$ (d D^2) / (d E_2) = 2 (p_x sin E_2 - p_y cos E_2) $
+
+Setting $d D^2 \/ d E_2 = 0$:
+
+$ p_x sin E_2 = p_y cos E_2 quad ==> quad E_2 = op("atan2")(p_y, p_x) $
+
+The second derivative $d^2 D^2 \/ d E_2^2 = 2 (p_x cos E_2 + p_y sin E_2)$ evaluated at this root is $2 sqrt(p_x^2 + p_y^2) > 0$, confirming it is a minimum (the other stationary point, at $E_2 + pi$, is the maximum). Substituting the definitions of $p_x, p_y$:
+
+$ E_2 = op("atan2")(q_y \/ b_2, quad q_x \/ a_2 + e_2) $ <atan2_proj>
+
+The derivation implicitly assumes $(p_x, p_y) != (0, 0)$, or equivalently $bold(q) != (-a_2 e_2, 0)$. This degenerate case occurs only when $bold(q)$ sits exactly at the ellipse centre, far inside the orbit — not geometrically relevant for encounter problems, where $bold(q)$ is on the order of the planet's heliocentric distance.
+
+==== Why this works (and where it approximates)
+
+When the two orbital planes coincide ($i_"mut" = 0$), $bold(q)$ lies on the planet's ellipse, $T(bold(q))$ lies on the unit circle, and the closest-point-on-circle is $T(bold(q))$ itself: @atan2_proj returns the exact $E_2$.
+
+For inclined orbits, the orthogonal projection $bold(B)^top bold(A) bold(r)_1$ shortens $bold(q)$ relative to its true heliocentric extent, so $T(bold(q))$ moves off the unit circle and @atan2_proj returns only the *angle* of the closest circle point, not the true minimiser of the Euclidean distance on the original ellipse (the affine $T$ stretches the metric non-uniformly). This is the structural source of the approximation error.
+
+@fig_atan2_geometry shows both frames. A naïve alternative — "pick the ellipse point along the Sun-ray through $bold(q)$" — is strictly worse: the focal ray is not perpendicular to the ellipse at the intersection because the focus is off-centre, so that intersection is not a closest point. Only the affine transformation $T$, which places the *ellipse centre* (not the Sun) at the new origin, makes ray-from-origin geometrically meaningful.
+
+#figure(
+  image("atan2_geometry.svg", width: 100%),
+  caption: [Geometric derivation of the atan2 projection, for an ellipse with $a = 1$, $e = 0.5$. *Left:* original coordinates; Sun (yellow star) at the focus = origin, ellipse centre at $(-a e, 0)$ is a distinct point. An off-ellipse probe point $bold(q)$ (blue dot) has three candidate eccentric anomalies: the Sun-ray intersection (red triangle), the atan2 projection @atan2_proj (green square), and the true minimum-distance point (magenta diamond, numerical). *Right:* the affine transformation $T$ maps the ellipse to a unit circle. The new origin coincides with the *ellipse centre*; the Sun has moved to $(e, 0)$. The atan2 projection is now simply the ray from the new origin through $T(bold(q))$, hitting the unit circle at the closest circle point. Back-transforming recovers the green square.],
+) <fig_atan2_geometry>
+
+==== Accuracy
+
+When the orbital planes coincide, the projection is exact and @atan2_proj returns the correct $E_2$. For inclined orbits, the error grows with the mutual inclination $i_"mut"$ and with the spacecraft eccentricity $e_1$ (which spreads the spacecraft trajectory further from the planet's plane). Numerical evaluation for a Pluto-like target ($i_"mut" = 17°$, $e_2 = 0.25$) shows the maximum $E_2$ error is under $2°$ for moderate $e_1 < 0.5$, growing to $~ 9°$ at favourable Hohmann-like geometries ($e_1 approx 0.95$) and up to $~ 63°$ at unfavourable ascending-node orientations. Newton's method converges reliably from any of these seeds, so the formula is adequate despite its worst-case degradation.
+
+== Initial guess via mutual line of nodes <sec_nodal_guess>
+
+An alternative initial guess exploits the geometry of the two orbital planes directly. The *mutual line of nodes* is the intersection of the two planes — a line through the common focus (the Sun). Its direction is:
+
+$ bold(ell) = hat(bold(n))_1 times hat(bold(n))_2, quad hat(bold(n))_1 = bold(A)_(:,1) times bold(A)_(:,2), quad hat(bold(n))_2 = bold(B)_(:,1) times bold(B)_(:,2) $ <node_line>
+
+where $hat(bold(n))_1$ is the unit normal to the spacecraft's orbital plane and $hat(bold(n))_2$ is the unit normal to the planet's orbital plane (each obtained as the cross product of the two orthonormal columns of $bold(A)$ and $bold(B)$ respectively). Hence $|bold(ell)| = sin(i_"mut")$ with $i_"mut"$ the mutual inclination between the two planes. When both bodies lie on the same ray from the Sun along $bold(ell)$, the out-of-plane component of their separation vanishes — this is a natural 3D minimum-distance configuration.
+
+Project $bold(ell)$ into each orbital plane: $bold(lambda)_1 = bold(A)^top bold(ell)$, $bold(lambda)_2 = bold(B)^top bold(ell)$ (both 2D). The eccentric anomaly at which $bold(r)_i (E_i)$ is parallel to $bold(lambda)_i$ satisfies the cross-product equation $(bold(r)_i times bold(lambda)_i)_z = 0$:
+
+$ a_i lambda_y cos E_i - b_i lambda_x sin E_i = a_i e_i lambda_y $ <node_ell_eq>
+
+which using $A cos E - B sin E = R cos(E - phi.alt)$ with $R = sqrt((a_i lambda_y)^2 + (b_i lambda_x)^2)$, $phi.alt = op("atan2")(-b_i lambda_x, #h(0.2em) a_i lambda_y)$ reduces to:
+
+$ E_i = phi.alt plus.minus arccos((a_i e_i lambda_y) / R) $ <node_ell_sol>
+
+The two roots correspond to $bold(r)_i ∥ +bold(ell)$ and $bold(r)_i ∥ -bold(ell)$; classify by the sign of $bold(r)_i (E_i) dot bold(lambda)_i$. The *same-side* pairings $(E_1^+, E_2^+)$ and $(E_1^-, E_2^-)$ are the two candidate initial guesses.
+
+*Hyperbolic spacecraft.* @node_ell_eq becomes $A cosh H - B sinh H = a_1 e_1 lambda_y$. When $A^2 > B^2$, set $R = op("sgn")(A) sqrt(A^2 - B^2)$, $phi.alt = op("atanh")(B\/A)$, giving $H_1 = phi.alt plus.minus op("arcosh")(a_1 e_1 lambda_y \/ R)$ whenever $a_1 e_1 lambda_y \/ R >= 1$. If the discriminant or $op("arcosh")$ argument fails, the line of nodes does not intersect the reachable branch of the hyperbola.
+
+*Experimental comparison.* We evaluated both initial-guess strategies against four Voyager 2 encounters — three elliptic (Earth, Mars, Jupiter) and one hyperbolic (Saturn, using the Jupiter-to-Saturn leg) — and report the 3D separation $d$ at the guess alongside the separation $d^*$ at the converged true minimum.
+
+#figure(
+  table(
+    columns: (auto, auto, auto, auto, auto, auto),
+    align: (left, right, right, right, right, right),
+    table.header[*Target*][*$i_"mut"$*][*$d^*$ (km)*][*$d_"atan2"$ (km)*][*$d_"nod"$ (km)*][*$d_"atan2" \/ d_"nod"$*],
+    [Earth (ell.)],    [$5.02°$],  [$2.57 times 10^6$], [$3.17 times 10^6$], [$4.21 times 10^6$], [$0.75$],
+    [Mars  (ell.)],    [$5.11°$],  [$1.38 times 10^7$], [$1.56 times 10^7$], [$5.24 times 10^7$], [$0.30$],
+    [Jupiter (ell.)],  [$5.99°$],  [$2.59 times 10^5$], [$1.01 times 10^7$], [$2.00 times 10^6$], [$bold(5.05)$],
+    [Saturn (hyp.)],   [$0.26°$],  [$6.45 times 10^5$], [$1.24 times 10^7$], [$1.29 times 10^8$], [$0.097$],
+  ),
+  caption: [Initial-guess 3D separation for the midpoint-plus-atan2 ($d_"atan2"$) and mutual-nodal ($d_"nod"$) strategies, versus the converged true minimum $d^*$. Earth/Mars are non-encounters (Voyager 2 does not enter their SOIs) and serve only as geometric probes. Jupiter is the intended close encounter, where the nodal guess wins by $5.05 times$. Saturn at $i_"mut" = 0.26°$ is a worst case for the nodal method: the line of nodes is poorly defined and the nodal root lands on the wrong asymptotic branch of the hyperbola.],
+) <tab_initial_guess>
+
+@tab_initial_guess supports a simple dispatch rule: compute both guesses (each is $cal(O)(1)$), evaluate $f$ at each, and seed Newton with whichever yields smaller $d$.
 
 
-= Finding minimum distance using Newton's Method
+= Finding minimum distance using Newton's Method <sec_newton>
 
 We seek to minimise $f(E_1, E_2) := r_1^2 + r_2^2 - bold(p)_1^top bold(M) bold(p)_2 - r_"SOI"^2$ using Newton's method. Each iteration solves the $2 times 2$ linear system $bold(H) bold(delta) = -nabla f$ for the step $bold(delta) = (delta E_1, delta E_2)^top$, then updates $E_i <- E_i + delta E_i$.
 
-== Deriving the gradient and Hessian
+== Deriving the gradient and Hessian <sec_grad_hess>
 
 We differentiate each term with respect to $E_i$.
 
@@ -236,260 +331,25 @@ $ delta E_1 = ((partial f) / (partial E_1) H_(22) - (partial f) / (partial E_2) 
 
 All coupling terms are bilinear forms $bold(x)^top bold(M) bold(y)$ with 2D vectors, each requiring 4 multiplies and 3 adds. The five needed dot products ($hat(bold(w))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(w))_2$, $hat(bold(u))_1^top bold(M) bold(p)_2$, $bold(p)_1^top bold(M) hat(bold(u))_2$, $hat(bold(w))_1^top bold(M) hat(bold(w))_2$) can share the intermediate products $bold(M) bold(p)_2$, $bold(M) hat(bold(w))_2$, $bold(M) hat(bold(u))_2$ (each a 2D matrix-vector multiply).
 
-= Encounter Intervals in $E_1$ and $E_2$
-
-In previous section we've obtained the minima of the distance function $f(E_1, E_2)$. If the minimum is less than $r_"SOI"$, then spacecraft enters SOI of the planet. However, our end goal is to find *where* and *when* does the spacecraft intersect SOI *boundary*. In other words, finding roots of $f(E_1, E_2) = 0$.
-
-The constraint $f(E_1, E_2) = 0$ defines an implicit curve (or set of curves) in the $(E_1, E_2)$ plane. The *encounter interval* $[E_(1,min), E_(1,max)]$ is the projection of this curve onto the $E_1$ axis, and $[E_(2,min), E_(2,max)]$ is the projection onto the $E_2$ axis. For every $E_1$ in the first interval there exists at least one $E_2$ in the second interval such that the distance equals $r_"SOI"$.
-
-#import "@preview/cetz:0.3.4"
-
-#figure(
-  cetz.canvas(length: 2cm, {
-    import cetz.draw: *
-
-    let w = 7
-    let h = 5
-
-    // axes
-    line((0, 0), (w + 0.6, 0), mark: (end: "stealth", fill: black, scale: 0.5))
-    line((0, 0), (0, h + 0.6), mark: (end: "stealth", fill: black, scale: 0.5))
-    content((w + 0.6, -0.35), $E_1$)
-    content((-0.35, h + 0.6), $E_2$)
-
-    // constraint curve (tilted ellipse)
-    let cx = w / 2
-    let cy = h / 2
-    let a = 2.4
-    let b = 1.4
-    let theta = 30deg
-
-    // points on tilted ellipse: parametric angle t
-    let ellipse-pt(t) = {
-      let ct = calc.cos(t)
-      let st = calc.sin(t)
-      let x = a * ct * calc.cos(theta) - b * st * calc.sin(theta) + cx
-      let y = a * ct * calc.sin(theta) + b * st * calc.cos(theta) + cy
-      (x, y)
-    }
-
-    // find extremal points analytically
-    // dx/dt = 0: tan(t) = -b sin(theta) / (a cos(theta)) → vertical tangent (E1 extrema)
-    // calc.atan2(x, y) in Typst returns atan(y/x)
-    let tv = calc.atan2(a * calc.cos(theta), -b * calc.sin(theta))
-    // dy/dt = 0: tan(t) = -b cos(theta) / (a sin(theta)) → horizontal tangent (E2 extrema)
-    let th = calc.atan2(a * calc.sin(theta), b * calc.cos(theta))
-
-    let e1-max-pt = ellipse-pt(tv)
-    let e1-min-pt = ellipse-pt(tv + 180deg)
-    let e2-max-pt = ellipse-pt(th)
-    let e2-min-pt = ellipse-pt(th + 180deg)
-
-    // draw the ellipse curve
-    let npts = 80
-    let pts = range(npts + 1).map(i => {
-      let t = i / npts * 360deg
-      ellipse-pt(t)
-    })
-    line(..pts, close: true, stroke: 1.2pt + black)
-
-    // projection lines and labels for E1 bounds
-    let dash-style = (dash: "dashed", paint: gray)
-
-    // E1_min
-    line(e1-min-pt, (e1-min-pt.at(0), 0), stroke: dash-style)
-    content((e1-min-pt.at(0), -0.4), $E_(1,min)$, anchor: "north")
-
-    // E1_max
-    line(e1-max-pt, (e1-max-pt.at(0), 0), stroke: dash-style)
-    content((e1-max-pt.at(0), -0.4), $E_(1,max)$, anchor: "north")
-
-    // E2_min
-    line(e2-min-pt, (0, e2-min-pt.at(1)), stroke: dash-style)
-    content((-0.4, e2-min-pt.at(1)), $E_(2,min)$, anchor: "east")
-
-    // E2_max
-    line(e2-max-pt, (0, e2-max-pt.at(1)), stroke: dash-style)
-    content((-0.4, e2-max-pt.at(1)), $E_(2,max)$, anchor: "east")
-
-    // interval brackets on axes
-    let bracket-color = blue
-    line(
-      (e1-min-pt.at(0), -0.05), (e1-max-pt.at(0), -0.05),
-      stroke: 2pt + bracket-color,
-    )
-    line(
-      (-0.05, e2-min-pt.at(1)), (-0.05, e2-max-pt.at(1)),
-      stroke: 2pt + bracket-color,
-    )
-
-    // critical points
-    let dot-radius = 0.08
-
-    // vertical tangent points (∂f/∂E₂ = 0) → E1 extrema
-    circle(e1-min-pt, radius: dot-radius, fill: red, stroke: none)
-    circle(e1-max-pt, radius: dot-radius, fill: red, stroke: none)
-
-    // horizontal tangent points (∂f/∂E₁ = 0) → E2 extrema
-    circle(e2-min-pt, radius: dot-radius, fill: eastern, stroke: none)
-    circle(e2-max-pt, radius: dot-radius, fill: eastern, stroke: none)
-
-    // tangent lines at critical points
-    let tang-len = 1.0
-
-    // vertical tangents at E1 extrema
-    line(
-      (e1-min-pt.at(0), e1-min-pt.at(1) - tang-len),
-      (e1-min-pt.at(0), e1-min-pt.at(1) + tang-len),
-      stroke: (dash: "dotted", paint: red),
-    )
-    line(
-      (e1-max-pt.at(0), e1-max-pt.at(1) - tang-len),
-      (e1-max-pt.at(0), e1-max-pt.at(1) + tang-len),
-      stroke: (dash: "dotted", paint: red),
-    )
-
-    // horizontal tangents at E2 extrema
-    line(
-      (e2-min-pt.at(0) - tang-len, e2-min-pt.at(1)),
-      (e2-min-pt.at(0) + tang-len, e2-min-pt.at(1)),
-      stroke: (dash: "dotted", paint: eastern),
-    )
-    line(
-      (e2-max-pt.at(0) - tang-len, e2-max-pt.at(1)),
-      (e2-max-pt.at(0) + tang-len, e2-max-pt.at(1)),
-      stroke: (dash: "dotted", paint: eastern),
-    )
-
-    // curve label
-    content((cx + a * 0.5 + 0.5, cy + b + 0.4), $f(E_1, E_2) = 0$)
-
-    // legend
-    let lx = w - 1.5
-    let ly = 0.9
-    circle((lx, ly), radius: dot-radius, fill: red, stroke: none)
-    content((lx + 0.15, ly), $partial f \/ partial E_2 = 0$, anchor: "west")
-    circle((lx, ly - 0.5), radius: dot-radius, fill: eastern, stroke: none)
-    content((lx + 0.15, ly - 0.5), $partial f \/ partial E_1 = 0$, anchor: "west")
-  }),
-  caption: [
-    The constraint curve $f = 0$ in the $(E_1, E_2)$ plane. Red dots mark vertical tangents ($partial f \/ partial E_2 = 0$), whose $E_1$ coordinates give $E_(1,min)$ and $E_(1,max)$. Teal dots mark horizontal tangents ($partial f \/ partial E_1 = 0$), whose $E_2$ coordinates give $E_(2,min)$ and $E_(2,max)$. Blue bars on the axes show the projected encounter intervals.
-  ],
-) <encounter_intervals>
-
-#figure(
-  placement: none,
-  image("encounter_surface_3d.png", width: 100%),
-  caption: [
-    The surface $z = f(E_1, E_2) \/ r_"SOI"^2$ over the encounter region (Voyager 2 — Jupiter). The black curve is the $f = 0$ contour where the surface crosses the $z = 0$ plane. The black dot at $(E_1, E_2) approx (128.9°, 121.1°)$ marks the surface minimum (closest approach without accounting for the planet's gravity). Red dots mark $partial f \/ partial E_2 = 0$ at $E_1 approx 120.2°$ and $139.0°$ ($E_1$ extrema); green dots mark $partial f \/ partial E_1 = 0$ at $E_2 approx 115.3°$ and $126.9°$ ($E_2$ extrema).
-  ],
-) <encounter_surface>
-
-== Extrema via Lagrange multipliers
-
-Finding the extreme values of $E_2$ subject to $f(E_1, E_2) = 0$ is a constrained optimisation problem. The Lagrangian is:
-
-$ cal(L) = E_2 - lambda f(E_1, E_2) $
-
-Setting partial derivatives to zero:
-
-$ (partial cal(L)) / (partial E_1) = -lambda (partial f) / (partial E_1) = 0, quad (partial cal(L)) / (partial E_2) = 1 - lambda (partial f) / (partial E_2) = 0 $
-
-The second equation gives $lambda = 1 \/ (partial f \/ partial E_2)$, which is necessarily nonzero. Substituting into the first:
-
-$ -1 / (partial f \/ partial E_2) dot (partial f) / (partial E_1) = 0 $
-
-Since the prefactor is nonzero, this requires:
-
-$ (partial f) / (partial E_1) = 0 $ <E2_crit>
-
-By the same argument with $cal(L) = E_1 - lambda f$, the extrema of $E_1$ require:
-
-$ (partial f) / (partial E_2) = 0 $ <E1_crit>
-
-Geometrically, consider the surface $z = f(E_1, E_2)$ over the $(E_1, E_2)$ plane (@encounter_surface). The constraint curve $f = 0$ is the intersection of this surface with the $z = 0$ plane. The $E_2$ extrema of this intersection occur where the curve runs parallel to the $E_1$ axis — at these points, the surface's gradient in the $E_1$ direction is zero along the constraint, giving $partial f \/ partial E_1 = 0$.
-
-== System for $E_1$ bounds
-
-To find $E_(1,min)$ and $E_(1,max)$, solve the $2 times 2$ system:
-
-$ cases(
-  f(E_1, E_2) = 0,
-  (partial f) / (partial E_2) = 0
-) $ <E1_system>
-
-Using @grad2, the second equation is:
-
-$ 2 a_2^2 e_2 sin E_2 (1 - e_2 cos E_2) - bold(p)_1^top bold(M) hat(bold(w))_2 = 0 $
-
-Newton's method for this system uses the Jacobian:
-
-$ bold(J)_1 = mat(
-  (partial f) / (partial E_1), (partial f) / (partial E_2);
-  (partial^2 f) / (partial E_1 partial E_2), (partial^2 f) / (partial E_2^2)
-) = mat(
-  g_1, g_2;
-  H_(12), H_(22)
-) $ <J1>
-
-where $g_1 := partial f \/ partial E_1$ (@grad1), $g_2 := partial f \/ partial E_2$ (@grad2), and $H_(12)$, $H_(22)$ are the Hessian entries (@H12, @H22). The Newton step $bold(delta) = (delta E_1, delta E_2)^top$ solves $bold(J)_1 bold(delta) = -(f, g_2)^top$ via Cramer's rule:
-
-$ Delta_1 = g_1 H_(22) - g_2 H_(12) $
-
-$ delta E_1 = (f H_(22) - g_2^2) / Delta_1, quad delta E_2 = (f H_(12) - g_1 g_2) / Delta_1 $ <E1_step>
-
-Note that at convergence ($g_2 = 0$), the determinant simplifies to $Delta_1 = g_1 H_(22)$.
-
-== System for $E_2$ bounds
-
-To find $E_(2,min)$ and $E_(2,max)$, solve:
-
-$ cases(
-  f(E_1, E_2) = 0,
-  (partial f) / (partial E_1) = 0
-) $ <E2_system>
-
-Using @grad1, the second equation is:
-
-$ 2 a_1^2 e_1 sin E_1 (1 - e_1 cos E_1) - hat(bold(w))_1^top bold(M) bold(p)_2 = 0 $
-
-The Jacobian is:
-
-$ bold(J)_2 = mat(
-  (partial f) / (partial E_1), (partial f) / (partial E_2);
-  (partial^2 f) / (partial E_1^2), (partial^2 f) / (partial E_1 partial E_2)
-) = mat(
-  g_1, g_2;
-  H_(11), H_(12)
-) $ <J2>
-
-The Newton step solves $bold(J)_2 bold(delta) = -(f, g_1)^top$:
-
-$ Delta_2 = g_1 H_(12) - g_2 H_(11) $
-
-$ delta E_1 = (f H_(12) - g_1 g_2) / Delta_2, quad delta E_2 = (g_1^2 - f H_(11)) / Delta_2 $ <E2_step>
-
-At convergence ($g_1 = 0$), the determinant simplifies to $Delta_2 = -g_2 H_(11)$.
-
 = Time Constraint via Kepler's Equation
 
 The preceding sections treated $E_1$ and $E_2$ as independent variables. In reality, both bodies obey Kepler's equation, which couples each eccentric anomaly to a common time $t$.
 
 == Kepler's equation
 
-The mean motion $n_i = sqrt(mu \/ |a_i|^3)$ applies to both elliptic and hyperbolic orbits, since the derivation from the vis-viva equation depends only on $|a_i|$.
+The orbital period is $T_i = 2 pi sqrt(|a_i|^3 \/ mu)$, which applies to both elliptic and hyperbolic orbits since the derivation depends only on $|a_i|$.
 
 For an elliptic orbit $i$ with mean anomaly at epoch $M_(i,0)$:
 
-$ M_i (t) = M_(i,0) + n_i t = E_i - e_i sin E_i $ <kepler>
+$ M_i (t) = M_(i,0) + (2 pi) / T_i t = E_i - e_i sin E_i $ <kepler>
 
 For a hyperbolic spacecraft orbit:
 
-$ M_1 (t) = M_(1,0) + n_1 t = e_1 sinh H_1 - H_1 $ <kepler_hyp>
+$ M_1 (t) = M_(1,0) + (2 pi) / T_1 t = e_1 sinh H_1 - H_1 $ <kepler_hyp>
 
 At a given time $t$, both anomalies are determined:
 
-$ E_1 - e_1 sin E_1 = M_(1,0) + n_1 t, quad E_2 - e_2 sin E_2 = M_(2,0) + n_2 t $ <kepler_both>
+$ E_1 - e_1 sin E_1 = M_(1,0) + (2 pi) / T_1 t, quad E_2 - e_2 sin E_2 = M_(2,0) + (2 pi) / T_2 t $ <kepler_both>
 
 (replacing the first equation with @kepler_hyp for a hyperbolic spacecraft).
 
@@ -497,163 +357,198 @@ $ E_1 - e_1 sin E_1 = M_(1,0) + n_1 t, quad E_2 - e_2 sin E_2 = M_(2,0) + n_2 t 
 
 The position on an ellipse is $2 pi$-periodic in $E_i$, so each body returns to the same point after each full orbit. The set of times at which elliptic orbit $i$ passes through eccentric anomaly $E_i in [-pi, pi]$ is:
 
-$ t = (E_i - e_i sin E_i - M_(i,0) + 2 pi k_i) / n_i, quad k_i in ZZ $ <time_set>
+$ t = T_i / (2 pi) (E_i - e_i sin E_i - M_(i,0) + 2 pi k_i) = T_i / (2 pi) (M_i - M_(i,0) + 2 pi k_i), quad k_i in ZZ $ <time_set>
 
-A hyperbolic orbit is not periodic — the spacecraft passes through each $H_1$ exactly once:
+where $M_i = E_i - e_i sin E_i$ is the mean anomaly. A hyperbolic orbit is not periodic — the spacecraft passes through each $H_1$ exactly once:
 
-$ t = (e_1 sinh H_1 - H_1 - M_(1,0)) / n_1 $ <time_set_hyp>
+$ t = T_1 / (2 pi) (e_1 sinh H_1 - H_1 - M_(1,0)) $ <time_set_hyp>
 
 For an encounter, both bodies must be at their respective positions *simultaneously*. For two elliptic orbits, equating the time expressions:
 
-$ (E_1 - e_1 sin E_1 - M_(1,0) + 2 pi k_1) / n_1 = (E_2 - e_2 sin E_2 - M_(2,0) + 2 pi k_2) / n_2 $
+$ T_1 / (2 pi) (M_1 - M_(1,0) + 2 pi k_1) = T_2 / (2 pi) (M_2 - M_(2,0) + 2 pi k_2) $
 
-Rearranging gives a family of *time-coupling constraints*, one for each integer pair $(k_1, k_2)$:
+Simplifying and rearranging gives a family of *time-coupling constraints*, one for each integer pair $(k_1, k_2)$:
 
-$ h_(k_1,k_2) (E_1, E_2) := n_2 (E_1 - e_1 sin E_1 - M_(1,0)) - n_1 (E_2 - e_2 sin E_2 - M_(2,0)) + 2 pi (n_2 k_1 - n_1 k_2) = 0 $ <time_constraint>
+$ h(E_1, E_2; alpha) := T_1 (M_1 - M_(1,0)) - T_2 (M_2 - M_(2,0)) + 2 pi alpha = 0 $ <time_constraint>
 
-Each choice of $(k_1, k_2)$ corresponds to a different encounter opportunity (i.e.~orbit $1$ on its $k_1$-th revolution meeting orbit $2$ on its $k_2$-th revolution). Since only the combination $n_2 k_1 - n_1 k_2$ appears, the distinct constraints are parametrised by a single offset:
+where:
 
-$ h(E_1, E_2; alpha) := n_2 (E_1 - e_1 sin E_1 - M_(1,0)) - n_1 (E_2 - e_2 sin E_2 - M_(2,0)) + 2 pi alpha = 0 $ <time_constraint_alpha>
+$ alpha = T_1 k_1 - T_2 k_2 $ <alpha_def>
 
-where $alpha = n_2 k_1 - n_1 k_2$ ranges over a discrete set. In the $(E_1, E_2)$ plane (with $E_i in [-pi, pi]$), each value of $alpha$ gives a monotone curve from bottom-left to top-right, and consecutive curves are spaced apart by one spacecraft orbital period $T_1 = 2 pi \/ n_1$. The full encounter problem is: find $(E_1, E_2)$ satisfying both the distance constraint $f = 0$ (@constraint_C) and $h = 0$ (@time_constraint_alpha) for some admissible $alpha$.
+The parameter $alpha$ has units of time: $T_1 k_1$ is the time for body 1 to complete $k_1$ orbits, $T_2 k_2$ is the time for body 2 to complete $k_2$ orbits, and $alpha$ is the mismatch. Each choice of $(k_1, k_2)$ corresponds to a different encounter opportunity (i.e.~orbit $1$ on its $k_1$-th revolution meeting orbit $2$ on its $k_2$-th revolution).
 
-*Hyperbolic spacecraft.* Since $k_1 = 0$ (@time_set_hyp), the time constraint simplifies to a family parametrised by $k_2$ alone. Replacing the spacecraft's mean anomaly expression:
+In the $(M_1, M_2)$ plane, @time_constraint defines a straight line with slope $T_1 \/ T_2$:
 
-$ h(H_1, E_2; k_2) := n_2 (e_1 sinh H_1 - H_1 - M_(1,0)) - n_1 (E_2 - e_2 sin E_2 - M_(2,0)) - 2 pi n_1 k_2 = 0 $ <time_constraint_hyp>
+$ M_2 = T_1 / T_2 (M_1 - M_(1,0)) + M_(2,0) + (2 pi alpha) / T_2 $
 
-== Finding the next encounter after $t_0$
+Different values of $alpha$ shift the line parallel to itself. The full encounter problem is: find $(E_1, E_2)$ satisfying both the distance constraint $f = 0$ (@constraint_C) and $h = 0$ (@time_constraint) for some admissible $alpha$.
 
-After each gravity assist, the spacecraft's orbit changes, so it only makes sense to find the *next* encounter from a given epoch $t_0$ rather than enumerating all future encounters on a fixed orbit.
+*Hyperbolic spacecraft.* Since $k_1 = 0$ (@time_set_hyp), the time constraint simplifies to a family parametrised by $k_2$ alone, with $alpha = -T_2 k_2$:
 
-The distance constraint can produce up to two separate encounter zones (corresponding to the two symmetric coarse intervals from @coarse_bounds). Each zone $s in {1, 2}$ has its own encounter intervals $[E_(1,min)^((s)), E_(1,max)^((s))]$ and $[E_(2,min)^((s)), E_(2,max)^((s))]$ from @encounter_intervals. Since the mean anomaly $M_i = E_i - e_i sin E_i$ is monotone in $E_i$, each zone corresponds to mean-anomaly intervals:
-
-$ M_(i,min)^((s)) = E_(i,min)^((s)) - e_i sin E_(i,min)^((s)), quad M_(i,max)^((s)) = E_(i,max)^((s)) - e_i sin E_(i,max)^((s)) $ <M_bounds>
-
-For a hyperbolic spacecraft orbit: $M_(1,min)^((s)) = e_1 sinh H_(1,min)^((s)) - H_(1,min)^((s))$ (and likewise for $M_(1,max)^((s))$).
-
-On its $k_i$-th elliptic orbit, body $i$ passes through encounter zone $s$ during the time interval (@time_set):
-
-$ t in [(M_(i,min)^((s)) - M_(i,0) + 2 pi k_i) / n_i, quad (M_(i,max)^((s)) - M_(i,0) + 2 pi k_i) / n_i] $ <time_interval>
-
-A hyperbolic spacecraft passes through each encounter zone at most once. Setting $k_1 = 0$ in the above (with the hyperbolic mean anomaly from @time_set_hyp):
-
-$ t in [(M_(1,min)^((s)) - M_(1,0)) / n_1, quad (M_(1,max)^((s)) - M_(1,0)) / n_1] $ <time_interval_hyp>
-
-An encounter requires both bodies to be in their respective intervals of the *same* zone *simultaneously*.
-
-=== Choosing the iteration order
-
-Label the body with the tighter encounter zone (smaller $M_(i,max)^((s)) - M_(i,min)^((s))$) as $i$ and the other as $j$. Iterating over passes of the tighter-zone body produces fewer candidates, since each pass occupies a shorter time interval and is less likely to overlap with the other body. The formulas below use $i$ for the outer loop and $j$ for the overlap check. For a hyperbolic spacecraft, always start with the spacecraft ($i = 1$): it has a single fixed time interval per zone (@time_interval_hyp), so just find which planet passes ($k_2$) overlap it.
-
-=== First pass of body $i$ after $t_0$
-
-For each zone $s$, body $i$ enters the encounter zone for the first time after $t_0$ on orbit number:
-
-$ k_i^((s)) = ceil((n_i t_0 + M_(i,0) - M_(i,max)^((s))) / (2 pi)) $ <ki_start>
-
-This is the smallest integer $k_i$ for which the encounter interval of body $i$ (@time_interval) has not ended before $t_0$. Start with $k_i^* = min_s k_i^((s))$, the earliest pass that enters *either* zone.
-
-=== Checking for overlap with body $j$
-
-On each pass $k_i^*$, check both zones $s in {1, 2}$. The encounter window of body $i$ in zone $s$, clamped to start no earlier than $t_0$, is:
-
-$ t_(i,"lo")^((s)) = max((M_(i,min)^((s)) - M_(i,0) + 2 pi k_i^*) / n_i, quad t_0), quad t_(i,"hi")^((s)) = (M_(i,max)^((s)) - M_(i,0) + 2 pi k_i^*) / n_i $ <ti_window>
-
-If $t_(i,"lo")^((s)) > t_(i,"hi")^((s))$, body $i$ is not in zone $s$ on this pass. Otherwise, the earliest orbit of body $j$ that could overlap is:
-
-$ k_j = ceil((n_j t_(i,"lo")^((s)) + M_(j,0) - M_(j,max)^((s))) / (2 pi)) $ <kj_check>
-
-Body $j$ enters zone $s$ on orbit $k_j$ at time $t_(j,"lo") = (M_(j,min)^((s)) - M_(j,0) + 2 pi k_j) / n_j$. If $t_(j,"lo") <= t_(i,"hi")^((s))$, the two windows overlap — this zone produces a candidate encounter. If both zones produce a match on the same pass, pick the one with the smaller $t_(j,"lo")$ (the earlier encounter). The resulting pair $(k_1, k_2)$ yields $alpha = n_2 k_1 - n_1 k_2$, which is the value to use in Newton's method on the combined system (@time_jacobian).
-
-If neither zone produces a match on pass $k_i^*$, increment $k_i^* <- k_i^* + 1$ and repeat. For a hyperbolic spacecraft ($i = 1$), there is no incrementing — if no planet pass overlaps the spacecraft's single encounter window, no encounter exists on this orbit.
-
-== Gradient of $h$
-
-$ (partial h) / (partial E_1) = n_2 (1 - e_1 cos E_1), quad (partial h) / (partial E_2) = -n_1 (1 - e_2 cos E_2) $ <time_grad>
-
-For a hyperbolic spacecraft orbit:
-
-$ (partial h) / (partial H_1) = n_2 (e_1 cosh H_1 - 1) $ <time_grad_hyp>
-
-This is always positive (since $e_1 > 1$ and $cosh H_1 >= 1$), matching the sign of the elliptic case.
-
-== Newton's method on the combined system
-
-For a given $alpha$, we solve the $2 times 2$ system $(f, h) = bold(0)$ using Newton's method. The Jacobian is:
-
-$ bold(J) = mat(
-  (partial f) / (partial E_1), (partial f) / (partial E_2);
-  (partial h) / (partial E_1), (partial h) / (partial E_2)
-) = mat(
-  g_1, g_2;
-  n_2 (1 - e_1 cos E_1), -n_1 (1 - e_2 cos E_2)
-) $ <time_jacobian>
-
-The Newton step $bold(delta) = (delta E_1, delta E_2)^top$ solves $bold(J) bold(delta) = -(f, h)^top$ via Cramer's rule:
-
-$ Delta = -g_1 n_1 (1 - e_2 cos E_2) - g_2 n_2 (1 - e_1 cos E_1) $
-
-$ delta E_1 = (f n_1 (1 - e_2 cos E_2) + g_2 h) / Delta $ <time_step1>
-
-$ delta E_2 = (-f n_2 (1 - e_1 cos E_1) - g_1 h) / Delta $ <time_step2>
-
-where $g_1$, $g_2$ are the distance-constraint gradient components (@grad1, @grad2) and $h$ is evaluated from @time_constraint_alpha (so $alpha$ enters the Newton step through $h$). Since $partial h \/ partial E_1 > 0$ and $partial h \/ partial E_2 < 0$ always, the Jacobian is non-singular whenever $(g_1, g_2)$ is not parallel to $(n_2 r_1 \/ a_1, -n_1 r_2 \/ a_2)$.
-
-For a hyperbolic spacecraft orbit, the same Cramer's rule formulas apply with $(1 - e_1 cos E_1)$ replaced by $(e_1 cosh H_1 - 1)$ (@time_grad_hyp), $g_1$ from @grad1_hyp, and $h$ from @time_constraint_hyp.
+$ h(H_1, E_2; k_2) := T_1 (e_1 sinh H_1 - H_1 - M_(1,0)) - T_2 (E_2 - e_2 sin E_2 - M_(2,0)) - 2 pi T_2 k_2 = 0 $ <time_constraint_hyp>
 
 #figure(
-  placement: none,
-  image("encounter_contours.svg", width: 100%),
-  caption: [
-    The distance constraint $f(E_1, E_2) = 0$ (solid black) and time constraints $h(E_1, E_2; alpha) = 0$ (dashed, coloured by year) for the Voyager 2 — Jupiter system (1970–1990). Each dashed curve corresponds to a different encounter opportunity, spaced by the spacecraft's orbital period ($T_1 approx 7$ years). Intersections of the dashed curves with the solid curve are solutions to the full encounter problem.
-  ],
-) <encounter_contours>
+  image("encounter_contours_M.svg", width: 90%),
+  caption: [Distance constraint $f = 0$ and time-coupling lines for the Voyager 2 — Jupiter encounter, plotted in the $(M_1, M_2)$ mean-anomaly domain. The black closed curve is the locus where the spacecraft--planet separation equals $r_"SOI"$; the red dashed ellipse is the second-order Taylor expansion of $f$ about its minimum. Gray lines are the family of time constraints @time_constraint, labelled by $(k_1, k_2)$. An encounter exists wherever a gray line intersects the black curve. Blue stars mark the mutual-node same-side pairings (@sec_nodal_guess): the *ascending* pair lands at $(M_1, M_2) approx (96°, 118°)$ with spacecraft--planet separation $2.0 times 10^6 "km" approx 0.04 r_"SOI"$ (inside the SOI, as expected for this encounter), while the *descending* pair at $(-2°, -52°)$ has separation $6.1 times 10^8 "km" approx 12.6 r_"SOI"$ (orbits pass far apart on the opposite node).],
+) <fig_encounter_M>
 
+= Finding the actual encounter
 
-== Initial guess
+The geometric minimisation of @sec_newton yields $(E_1^*, E_2^*)$ where $f$ attains its minimum $f^* <= 0$ — a *potential* encounter ignoring when the bodies are actually there. The time constraint @time_constraint selects a discrete family of straight lines in $(M_1, M_2)$, one per integer pair $(k_1, k_2)$. The actual SOI entry is the earliest point (in $t$) lying on both the $f = 0$ contour and one of these lines.
 
-The unconstrained minimisation of $f$ (from the Newton step in @constraint_C) yields the closest-approach point $(E_1^*, E_2^*)$ where $nabla f = 0$. At this point, evaluate $f_min := f(E_1^*, E_2^*)$ and the Hessian $bold(H)$ (@H11, @H22, @H12).
+== Initial guess via line--ellipse intersection <sec_line_ellipse>
 
-=== Quadratic approximation of $f = 0$
+Near $(E_1^*, E_2^*)$, the second-order expansion of $f$ defines an ellipse in $E$-space, $(bold(E) - bold(E)^*)^top bold(H) (bold(E) - bold(E)^*) <= -2 f^*$, where $bold(H)$ is the Hessian from @sec_grad_hess. Since the time constraint lives in $(M_1, M_2)$, transform the Hessian into the $M$-domain using the diagonal Jacobian $bold(J) = op("diag")(1 - e_1 cos E_1^*, 1 - e_2 cos E_2^*)$:
 
-The second-order Taylor expansion of a multivariable function around a point $bold(a)$ is:
+$ bold(H)_M = bold(J)^(-1) bold(H) bold(J)^(-1), quad (bold(H)_M)_(i j) = H_(i j) / ((1 - e_i cos E_i^*)(1 - e_j cos E_j^*)) $ <H_M>
 
-$ f(bold(x)) approx f(bold(a)) + nabla f(bold(a))^top (bold(x) - bold(a)) + 1/2 (bold(x) - bold(a))^top bold(H)(bold(a)) (bold(x) - bold(a)) $
+The Taylor ellipse in $(M_1, M_2)$ is then $(bold(M) - bold(M)^*)^top bold(H)_M (bold(M) - bold(M)^*) <= -2 f^*$.
 
-Let $bold(a) = (E_1^*, E_2^*)$, $bold(delta) = (E_1^* - E_1, E_2^* - E_2)^top$, and $bold(x) = bold(a) - bold(delta)$. At the minimum, the gradient vanishes ($nabla f = 0$), so the linear term drops out (the sign of $bold(delta)$ does not matter in the quadratic term):
+Intersect the time line with this ellipse — a closed-form 2×2 quadratic in a single parameter. Take the intersection point with the smaller $M_1$ (earliest in time in this encounter zone). Convert back to eccentric anomalies by inverting Kepler's equation $M_i = E_i - e_i sin E_i$ (one Newton iteration from $E_i approx M_i$ is sufficient near the minimum).
 
-$ f approx f_min + 1/2 bold(delta)^top bold(H) bold(delta) $
+== Candidate selection on the integer lattice
 
-Setting $f = 0$:
+Define $alpha^*$ as the value of $alpha$ that places the time line through the geometric minimum. Evaluating @time_constraint at $(E_1^*, E_2^*)$:
 
-$ bold(delta)^top bold(H) bold(delta) = -2 f_min $ <ellipse_approx>
+$ alpha^* := (T_2 (M_2^* - M_(2,0)) - T_1 (M_1^* - M_(1,0))) / (2 pi), quad M_i^* := E_i^* - e_i sin E_i^* $ <alpha_star>
 
-Written out, the left side is $H_(11) delta_1^2 + 2 H_(12) delta_1 delta_2 + H_(22) delta_2^2$ — the general equation of a conic section. Since $bold(H)$ is positive definite at a minimum, this conic is an ellipse. The right side $-2 f_min > 0$ when $f_min < 0$ (the orbits come within $r_"SOI"$), so the ellipse is valid.
+Admissible $alpha$ lie on the lattice $cal(L) := {T_1 k_1 - T_2 k_2 : (k_1, k_2) in ZZ^2}$. For each integer $k_1$, the $k_2$ that minimises $|alpha - alpha^*|$ is:
 
-=== Linearised time constraint
+$ k_2 (k_1) = op("round")((T_1 k_1 - alpha^*) / T_2). $ <k2_of_k1>
 
-The time constraint $h(E_1, E_2; alpha) = 0$ is linearised around $(E_1^*, E_2^*)$:
+With $k_2$ determined by $k_1$ this way, the search reduces to finding the smallest $k_1$ — subject to a mission-start floor — that puts the time line inside the Taylor ellipse around $(M_1^*, M_2^*)$. The mission-start floor is
 
-$ h^* - h_1^* delta_1 - h_2^* delta_2 = 0 $
+$ k_1^"min" = ceil(t_"start" \/ T_1 - (M_1^* - M_(1,0)) \/ (2 pi)), $ <k1_min>
 
-where $h^* = h(E_1^*, E_2^*; alpha)$, $h_1^* = n_2 (1 - e_1 cos E_1^*)$, $h_2^* = -n_1 (1 - e_2 cos E_2^*)$ (@time_grad). This gives $delta_2 = c + m delta_1$ with:
+ensuring $t_"enc" >= t_"start"$ for the returned encounter. The remaining task is to locate the smallest $k_1 >= k_1^"min"$ whose $(k_1, k_2(k_1))$ satisfies $|alpha - alpha^*| <= Delta alpha$, where $Delta alpha$ is the admissibility half-width derived next.
 
-$ c = h^* / h_2^*, quad m = h_1^* / h_2^* $
+=== Admissibility window $Delta alpha$ <sec_W>
 
-=== Intersection
+As $alpha$ varies, the time line slides without tilting — the slope $s := T_1 \/ T_2$ is fixed, only the intercept moves. We want the largest drift of $alpha$ from $alpha^*$ before the line loses contact with the Taylor ellipse. At that drift, the line is *tangent* to the ellipse; call it $Delta alpha$.
 
-Substituting $delta_2 = c + m delta_1$ into @ellipse_approx yields a quadratic in $delta_1$:
+Work in local coordinates $Delta M_i := M_i - M_i^*$ with Hessian entries abbreviated $H^M_(i j) := (bold(H)_M)_(i j)$. The ellipse is
 
-$ A delta_1^2 + B delta_1 + C = 0 $
+$ H^M_(1 1) Delta M_1^2 + 2 H^M_(1 2) Delta M_1 Delta M_2 + H^M_(2 2) Delta M_2^2 = -2 f^*, $ <ellipse_local>
 
-with coefficients:
+and the time line is $Delta M_2 = s #h(0.1em) Delta M_1 + d_0$ with $d_0 := (2 pi \/ T_2)(alpha - alpha^*)$.
 
-$ A = H_(11) + 2 H_(12) m + H_(22) m^2 $
-$ B = 2 c (H_(12) + H_(22) m) $
-$ C = H_(22) c^2 + 2 f_min $
+*Substitute the line into the ellipse.* Plug $Delta M_2 = s Delta M_1 + d_0$ into @ellipse_local and expand, collecting powers of $Delta M_1$:
 
-The two roots correspond to the two intersections of the time-constraint line with the encounter ellipse. The initial guess is the root with the larger $delta_1$ (smaller $E_1$, earlier encounter):
+$ A #h(0.1em) Delta M_1^2 + B #h(0.1em) Delta M_1 + C = 0, $ <quadratic_eq>
 
-$ delta_1 = (-B + sqrt(B^2 - 4 A C)) / (2 A) $ <initial_guess>
+where
 
-giving $(E_1^((0)), E_2^((0))) = (E_1^* - delta_1, E_2^* - c - m delta_1)$. If the discriminant $B^2 - 4 A C < 0$, the time-constraint line does not intersect the encounter ellipse for this $alpha$, and this encounter opportunity can be skipped.
+$ A &:= H^M_(1 1) + 2 s #h(0.1em) H^M_(1 2) + s^2 H^M_(2 2), \
+  B &:= 2 d_0 (H^M_(1 2) + s #h(0.1em) H^M_(2 2)), \
+  C &:= d_0^2 H^M_(2 2) + 2 f^*. $
+
+@quadratic_eq has two real roots (line crosses ellipse at two points), one real double root (tangent, single intersection), or no real roots (line misses ellipse), depending on the sign of its discriminant.
+
+*Tangency = zero discriminant.* The largest admissible $|d_0|$ is the value at which the line is tangent, i.e.~$B^2 - 4 A C = 0$:
+
+$ 4 d_0^2 (H^M_(1 2) + s #h(0.1em) H^M_(2 2))^2 - 4 A (d_0^2 H^M_(2 2) + 2 f^*) = 0. $
+
+Dividing by $4$ and isolating the $d_0^2$ coefficient:
+
+$ d_0^2 [(H^M_(1 2) + s #h(0.1em) H^M_(2 2))^2 - A #h(0.1em) H^M_(2 2)] = 2 A f^*. $ <disc_zero>
+
+*Simplify the bracket.* Expanding $A$:
+
+$ & (H^M_(1 2) + s H^M_(2 2))^2 - (H^M_(1 1) + 2 s H^M_(1 2) + s^2 H^M_(2 2)) H^M_(2 2) \
+& = (H^M_(1 2))^2 + 2 s H^M_(1 2) H^M_(2 2) + s^2 (H^M_(2 2))^2 - H^M_(1 1) H^M_(2 2) - 2 s H^M_(1 2) H^M_(2 2) - s^2 (H^M_(2 2))^2 \
+& = (H^M_(1 2))^2 - H^M_(1 1) H^M_(2 2) = -det(bold(H)_M). $
+
+The $s$-linear and $s$-quadratic terms cancel pairwise, leaving just $-det(bold(H)_M)$, which is negative since $bold(H)_M$ is positive definite.
+
+*Solve for $d_0^2$.* Substituting the simplified bracket into @disc_zero:
+
+$ -d_0^2 det(bold(H)_M) = 2 A f^* quad arrow.r.double quad d_0^2 = -2 A f^* \/ det(bold(H)_M). $
+
+Both sides are positive: $f^* < 0$ at a real encounter minimum, $det(bold(H)_M) > 0$, and $A > 0$ (quadratic form of $bold(H)_M$ evaluated along direction $(1, s)$).
+
+*Convert back to $alpha$.* Using $d_0 = (2 pi \/ T_2)(alpha - alpha^*)$:
+
+$ Delta alpha = (T_2 \/ (2 pi)) sqrt(-2 A f^* \/ det(bold(H)_M)), quad A = H^M_(1 1) + 2 s #h(0.1em) H^M_(1 2) + s^2 H^M_(2 2). $ <delta_alpha>
+
+*Interpretation.* $alpha = alpha^*$: line through the minimum. $|alpha - alpha^*| = Delta alpha$: line tangent to the ellipse. $|alpha - alpha^*| > Delta alpha$: line misses it entirely, no SOI entry on this revolution pair. The admissibility band is shaded in @fig_parker_venus.
+
+#figure(
+  image("encounter_contours_parker_venus.svg", width: 90%),
+  caption: [Parker-like spacecraft vs.~Venus in the $(M_1, M_2)$ mean-anomaly domain, cropped around the geometric minimum. The red dashed Taylor ellipse and the black $f = 0$ contour overlap to within line thickness. The green dotted line is $alpha = alpha^*$ (passing through the minimum); the dashed green lines at $alpha = alpha^* plus.minus Delta alpha$ are tangent to the Taylor ellipse and bound the admissibility band (shaded) derived in @sec_W. Here $Delta alpha = 0.372$ days, very narrow relative to the gray-line spacing, so the admissible $(k_1, k_2)$ is far from the nearest lattice line and is found by a continued-fraction search — the blue line is the first admissible pair, $(k_1, k_2) = (91, 41)$.],
+) <fig_parker_venus>
+
+=== Continued-fraction search for admissible $k_1$ <sec_cf_search>
+
+Given $alpha^*$, $Delta alpha$, and the mission-start floor $k_1^"min"$ from @k1_min, the remaining task is: find the smallest integer $k_1 >= k_1^"min"$ such that @k2_of_k1 produces a lattice point $alpha := T_1 k_1 - T_2 k_2$ inside $[alpha^* - Delta alpha, #h(0.1em) alpha^* + Delta alpha]$. Define the residual
+
+$ rho(k_1) := T_1 k_1 - T_2 dot op("round")((T_1 k_1 - alpha^*) \/ T_2) - alpha^* = alpha - alpha^*. $ <rho_def>
+
+By construction $rho(k_1) in (-T_2\/2, #h(0.2em) T_2\/2]$, and $k_1$ is admissible iff $|rho(k_1)| <= Delta alpha$. When $Delta alpha >= T_2\/2$ every $k_1$ is admissible and the answer is simply $k_1^"min"$. The interesting case is $Delta alpha << T_2\/2$, where admissible $k_1$ are sparse and must be located directly — without enumerating non-admissible values.
+
+==== Key observation: CF convergents as calibrated jumps
+
+As $k_1$ increases by $1$, $rho$ advances by a single large step on the circle $RR \/ T_2 ZZ$. Stepping $k_1$ by the denominator $q_n$ of the $n$-th CF convergent $(p_n, q_n)$ of $tau := T_1 \/ T_2$ instead advances $rho$ by
+$ eta_n dot T_2 := q_n T_1 - p_n T_2, $
+which is *small* (alternating sign with $n$, shrinking roughly geometrically). Each convergent therefore gives a different calibrated step size in $rho$-space.
+
+Any non-negative integer $Delta k$ has a unique *Ostrowski representation*
+
+$ Delta k = sum_(i >= 0) c_i q_i, quad 0 <= c_(i+1) <= a_(i+1), $ <ostrowski>
+
+where the $a_i$ are the partial quotients of $tau = [a_0; a_1, a_2, dots]$. Stepping $k_1$ by $Delta k$ shifts $rho$ by $sum_i c_i dot eta_i T_2$. Choosing the $c_i$ from large $i$ (tiny shifts) down to small $i$ (coarse shifts), we construct the smallest $Delta k$ that places $rho$ inside the admissibility band in $cal(O)(log(T_2 \/ Delta alpha))$ steps.
+
+==== Algorithm ($cal(O)(log)$)
+
+Following Visser (2023) §§3.4 and 6.1, adapted to our notation:
+
+1. Expand $tau = T_1 \/ T_2$ as a continued fraction,
+   $ tau = [a_0; a_1, a_2, dots], $
+   and generate convergents $(p_n, q_n)$ by the recursion
+   $ p_(-1) = 1, #h(0.5em) p_0 = a_0, #h(0.5em) p_(n+1) = a_(n+1) p_n + p_(n-1), quad q_(-1) = 0, #h(0.5em) q_0 = 1, #h(0.5em) q_(n+1) = a_(n+1) q_n + q_(n-1). $
+   Continue until $|eta_n| dot T_2 <= Delta alpha$; call this depth $L$. Because $q_n$ grows at least at the Fibonacci rate, $L = cal(O)(log(T_2 \/ Delta alpha))$.
+
+2. At each CF level $n = L, L-1, dots, 1$, test a *constant* number of integer candidates (typically 1–3) in the admissibility trapezoid at that level. The admissibility trapezoid is bounded by $((1 - delta) \/ q_n, #h(0.3em) (1 + delta) \/ q_n)$ along one basis direction, with the conjugate coordinate fixed by the ceiling rule of @k2_of_k1. Each candidate is one integer multiplication plus a comparison.
+
+3. Whenever a candidate at level $n$ satisfies $|rho| <= Delta alpha$ *and* the corresponding $k_1 >= k_1^"min"$, translate it back to the standard basis,
+   $ k_1 = x dot k_(2n) - y dot k_(2n+1), $
+   with $(k_n)$ satisfying the same recursion as $(q_n)$ but seeded by $(k_0, k_1) = (1, 0)$. Return this $k_1$.
+
+4. If no candidate at any level satisfies both constraints, $tau$ is rational (mean-motion resonance — the encounter does not recur at integer $(k_1, k_2)$) or the encounter is a geometric accident that cannot be converted into a real SOI crossing. Return failure.
+
+Total cost: $cal(O)(L) = cal(O)(log(T_2 \/ Delta alpha))$ integer operations. The returned $k_1$ is the smallest admissible value.
+
+Once $k_1$ is returned, the companion $k_2$ follows from @k2_of_k1:
+
+$ k_2 = op("round")((T_1 k_1 - alpha^*) \/ T_2). $
+
+==== Worked example: Parker-like / Venus
+
+With $tau = T_1 \/ T_2 = 0.447208$, the continued-fraction expansion is $tau = [0; 2, 4, 4, 4, 12, 3, 1, dots]$. The first few convergents and their errors are:
+
+#figure(
+  table(
+    columns: (auto, auto, auto, auto),
+    align: (right, right, right, right),
+    table.header[*$n$*][*$p_n \/ q_n$*][*$|eta_n| dot T_2$ (s)*][*within $Delta alpha$?*],
+    [1], [$1\/2$],   [$2.05 times 10^6$], [no],
+    [2], [$4\/9$],   [$4.83 times 10^5$], [no],
+    [3], [$17\/38$], [$1.18 times 10^5$], [no],
+    [4], [$72\/161$],[$9.64 times 10^3$], [*yes* — first time $<= Delta alpha = 3.21 times 10^4$ s],
+  ),
+) <tab_cf>
+
+The Ostrowski construction terminates at depth $L = 4$, yielding $(k_1, k_2) = (91, 40)$ with $rho(91) = -3.17 times 10^4$ s $in [-Delta alpha, Delta alpha]$. The corresponding time line (blue in @fig_parker_venus) crosses the Taylor ellipse, and the Newton refinement of @sec_line_ellipse converges to the SOI entry point at $t_"enc" approx 25.1$ years from epoch.
+
+==== Worked example: Voyager 2 / Jupiter
+
+With $tau = 0.587689$, the CF expansion is $tau = [0; 1, 1, 2, 2, 1, 5, dots]$. Here $Delta alpha = 59.06$ days is $2.7 %$ of $T_2 \/ 2$ — wide enough that the admissibility condition $|rho(k_1^"min")| <= Delta alpha$ is already satisfied at $k_1 = 0$. No Ostrowski expansion is needed: the algorithm returns $(k_1, k_2) = (0, 0)$ in one step, and the encounter occurs within the first revolution.
+
+==== Refinement and final encounter time
+
+After $(k_1, k_2)$ is chosen, the specific time line
+$ M_2 = (T_1 \/ T_2) M_1 + c_"line", quad c_"line" = -(T_1 \/ T_2) M_(1,0) + M_(2,0) + 2 pi alpha \/ T_2 $
+is intersected with the Taylor ellipse (cf.~@sec_line_ellipse) to obtain a seed $E_1$ at the SOI entry side of the ellipse, and a 1D Newton iteration along the line converges to the exact $f = 0$ crossing. The encounter time is then recovered via Kepler's equation applied to body 1:
+
+$ t_"enc" = (T_1 \/ (2 pi)) (M_(1,"enc") + 2 pi k_1 - M_(1,0)), quad M_(1,"enc") = E_1 - e_1 sin E_1. $ <t_enc_final>
+
+Equivalently via body 2 through the time-coupling constraint @time_constraint; agreement to floating-point precision between the two is a useful invariant test.

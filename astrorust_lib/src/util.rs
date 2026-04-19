@@ -37,3 +37,23 @@ pub fn format_with_thousand_separators(mut num: u64) -> String {
 
     String::from_utf8(bytes).expect("only ASCII digits and separators")
 }
+
+
+/// Solve `a·x² + b·x + c = 0` for real roots, returning `(x_plus, x_minus)`
+/// with `x_plus ≥ x_minus`. Returns `None` if the discriminant is negative
+/// or the leading coefficient is degenerate.
+pub fn solve_quadratic(a: f64, b: f64, c: f64) -> Option<(f64, f64)> {
+    if a.abs() < 1e-24 {
+        return None;
+    }
+    let disc = b * b - 4.0 * a * c;
+    if disc < 0.0 {
+        return None;
+    }
+    let sqrt_disc = disc.sqrt();
+    let inv_2a = 0.5 / a;
+    let x1 = (-b + sqrt_disc) * inv_2a;
+    let x2 = (-b - sqrt_disc) * inv_2a;
+    if x1 >= x2 { Some((x1, x2)) } else { Some((x2, x1)) }
+}
+
