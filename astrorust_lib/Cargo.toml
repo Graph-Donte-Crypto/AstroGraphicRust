@@ -41,3 +41,7 @@ harness = false
 [[bench]]
 name = "atan2_quartic"
 harness = false
+
+[[bench]]
+name = "levenberg_minimize_2d"
+harness = false

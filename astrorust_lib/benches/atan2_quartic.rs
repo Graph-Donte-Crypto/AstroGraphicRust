@@ -650,7 +650,7 @@ fn bench_encounter(c: &mut Criterion) {
             // Each variant: compute initial E₂ guess, then run full 2D Newton on
             // f(E₁, E₂) to convergence. Timing reflects the total cost of reaching
             // the encounter (initial guess + Newton iterations), matching the
-            // "find_encounters" algorithm in encounter.rs.
+            // "find_soi_minima" algorithm in encounter.rs.
             group.bench_function(format!("atan2/{}", case.label), |b| {
                 b.iter(|| {
                     let ea1 = e1s[ei % n];

@@ -109,14 +109,14 @@ impl<O> Orbit3D<O> {
     }
 }
 
-pub(crate) struct KeplerianElements {
-    pub(crate) mu: f64,
-    pub(crate) a: f64,
-    pub(crate) e: f64,
-    pub(crate) i: f64,
-    pub(crate) Omega: f64,
-    pub(crate) omega: f64,
-    pub(crate) M0: f64,
+pub struct KeplerianElements {
+    pub mu: f64,
+    pub a: f64,
+    pub e: f64,
+    pub i: f64,
+    pub Omega: f64,
+    pub omega: f64,
+    pub M0: f64,
 }
 
 const ECCENTRICITY_TOL: f64 = 1.0e-12;

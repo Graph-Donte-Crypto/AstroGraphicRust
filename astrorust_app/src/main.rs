@@ -7,7 +7,7 @@ use astrorust_gui_lib::na::UnitQuaternion;
 use astrorust_lib::AU_IN_KM;
 use astrorust_lib::angle::{EccAnomaly, HypAnomaly, IntoAnomaly};
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
-use astrorust_lib::encounter::find_encounters;
+use astrorust_lib::soi_minima::find_soi_minima;
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
@@ -76,7 +76,7 @@ fn first_future_encounter(spacecraft: &Spacecraft, planets: &[Body], t: Time) ->
         .enumerate()
         .find(|(_, planet)| {
             let encounters =
-                find_encounters(&spacecraft.trajectory, &planet.orbit, planet.soi_radius);
+                find_soi_minima(&spacecraft.trajectory, &planet.orbit, planet.soi_radius);
             eprintln!("Planet {} encounters: {encounters:?}", planet.body.name);
             !encounters.is_empty()
                 && match &spacecraft.trajectory {

@@ -15,6 +15,9 @@ pub mod state_vectors;
 pub mod time;
 pub mod trajectory;
 pub mod util;
+/// Find minima of `f(E1, E2) = d^2`
+pub mod soi_minima;
+/// Find the actual SOI entry on the geometric minimum found by `soi_minima`.
 pub mod encounter;
 
 
