@@ -3,7 +3,7 @@ use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::orbit_3d::Orbit3D;
 use crate::state_vectors::StateVectors;
 use crate::trajectory::Trajectory;
-use crate::util::{FloatExt, format_with_thousand_separators, solve_quadratic};
+use crate::util::{FloatExt, solve_quadratic};
 use nalgebra::{Matrix2, Vector2, Vector3};
 
 const MAX_ITER: usize = 50;
@@ -276,7 +276,7 @@ pub fn levenberg_minimize_2d(
     let mut lambda = 0.0_f64;
     let mut f = eval_f(E1, E2);
 
-    for i in 0..MAX_ITER {
+    for _i in 0..MAX_ITER {
         let (grad, hess) = gradient_hessian_at(E1, E2, spacecraft, planet, M);
         let (h11, h22) = (hess.m11, hess.m22);
 

@@ -1,3 +1,5 @@
+use nalgebra::Point3;
+
 pub trait FloatExt: Sized {
     fn sinh_cosh(self) -> (Self, Self);
 }
@@ -55,5 +57,9 @@ pub fn solve_quadratic(a: f64, b: f64, c: f64) -> Option<(f64, f64)> {
     let x1 = (-b + sqrt_disc) * inv_2a;
     let x2 = (-b - sqrt_disc) * inv_2a;
     if x1 >= x2 { Some((x1, x2)) } else { Some((x2, x1)) }
+}
+
+pub fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
+    Point3::<f32>::new(r.into(), g.into(), b.into()) / 255.0
 }
 

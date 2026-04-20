@@ -7,7 +7,9 @@ use crate::angle::{Angle, MeanAnomaly};
 use crate::kepler_equation::solve_kepler_householder_pade_elliptic;
 use crate::orbit::flat::elliptic::EllipticOrbit;
 use crate::orbit::orbit_3d::Orbit3D;
-use crate::soi_minima::{distance_sq, gradient_hessian_at, scaled_coupling_matrix};
+use crate::soi_minima::{
+    distance_sq, find_soi_minima, gradient_hessian_at, scaled_coupling_matrix,
+};
 use crate::trajectory::Trajectory;
 use crate::util::FloatExt;
 
@@ -17,14 +19,14 @@ const NEWTON_MAX_ITER: usize = 50;
 /// admissible encounter the first hit lies well below this; the cap exists to
 /// bound runtime when `τ = T1/T2` is (near-)rational and no admissible pair
 /// exists at all.
-const SEARCH_MAX_ITER: i64 = 1_000_000;
+const SEARCH_MAX_ITER: i64 = 1000;
 
 /// Real SOI entry: eccentric/hyperbolic anomalies at crossing, revolution
 /// indices `(k1, k2)` satisfying the time-coupling constraint, and the
 /// absolute time `t_enc` in seconds from epoch `t = 0`.
 #[derive(Debug, Clone, Copy)]
 pub struct Encounter {
-    pub t_enc: f64,
+    pub t_enc: DateTime<Utc>,
     pub E1: f64,
     pub E2: f64,
     pub k1: i64,
@@ -42,33 +44,31 @@ pub struct Encounter {
 /// The returned `t_enc` is in seconds from J2000.
 ///
 /// Returns `None` when no integer `(k1, k2)` inside the admissibility band
-/// `|T1·k1 − T2·k2 − α*| ≤ Δα` is found via the continued-fraction walk
+/// `|T1·k1 − T2·k2 − α*| ≤ Δα` is found within `SEARCH_MAX_ITER` unit steps
 /// (typically: `τ = T1/T2` is rational, or the minimum is a geometric
 /// accident that cannot be promoted to a real encounter).
 pub fn find_encounter(
     spacecraft: &Trajectory,
     planet: &Orbit3D<EllipticOrbit>,
     r_soi: f64,
-    minima: &[(f64, f64)],
     t_start: DateTime<Utc>,
 ) -> Option<Encounter> {
     // The distance² function has a (E1, E2) → (−E1, −E2) symmetry, so each
     // physical encounter shows up as two geometric minima corresponding to
-    // different revolution pairings / times. Try every minimum the caller
-    // supplies; return the encounter whose `t_enc` is the earliest at or
-    // after `t_start` (soonest future encounter). If none are after t_start,
-    // fall back to the globally earliest.
-    let j2000 = Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap();
-    let t_start_s = (t_start - j2000).num_seconds() as f64;
+    // different revolution pairings / times. Try every minimum returned by
+    // `find_soi_minima` and return the encounter whose `t_enc` is earliest
+    // at or after `t_start` (soonest future encounter). If none are after
+    // t_start, fall back to the globally earliest.
+    let minima = find_soi_minima(spacecraft, planet, r_soi);
     let candidates: Vec<_> = minima
         .iter()
         .filter_map(|&m| find_encounter_single(spacecraft, planet, r_soi, m, t_start))
         .collect();
     candidates
         .iter()
-        .filter(|e| e.t_enc >= t_start_s)
-        .min_by(|a, b| a.t_enc.partial_cmp(&b.t_enc).unwrap())
-        .or_else(|| candidates.iter().min_by(|a, b| a.t_enc.partial_cmp(&b.t_enc).unwrap()))
+        .filter(|e| e.t_enc >= t_start)
+        .min_by_key(|e| e.t_enc)
+        .or_else(|| candidates.iter().min_by_key(|e| e.t_enc))
         .copied()
 }
 
@@ -108,20 +108,23 @@ fn find_encounter_single(
 
     let t1 = time_scale(spacecraft);
     let t2 = time_scale_elliptic(planet);
-    // Rewind spacecraft's M0 from its own epoch to the planet's epoch (common
-    // t=0 for the rest of the calculation). M1(t) = M0 + n1·(t − t_body_epoch),
-    // so M1(planet_epoch) = M0 − n1·(spacecraft_epoch − planet_epoch).
-    let m1_0 = (m0_of(spacecraft) - TAU * t_start_s / t1).rem_euclid(TAU);
-    let m2_0 = planet.orbit_2d.0.M0().as_rad().rem_euclid(TAU);
+    // Both trajectories' stored `M0` are taken as referenced to J2000 (the
+    // system epoch). Advance both forward to `t_start` so the `M* − M0 ∈
+    // [0, 2π)` convention places `k1 = k2 = 0` on the first forward arc past
+    // `t_start` rather than past J2000.
+    let m1_0_at_tstart = m0_of(spacecraft) + TAU * t_start_s / t1;
+    let m2_0_at_tstart = planet.orbit_2d.0.M0().as_rad() + TAU * t_start_s / t2;
+    let m1_0 = m1_star - (m1_star - m1_0_at_tstart).rem_euclid(TAU);
+    let m2_0 = m2_star - (m2_star - m2_0_at_tstart).rem_euclid(TAU);
 
     let alpha_star = (t2 * (m2_star - m2_0) - t1 * (m1_star - m1_0)) / TAU;
     eprintln!(
-        "[encounter] M1*={m1_star:.6} rad  M10={m1_0:.6} rad  (M1*-M10)={:.6} rad  T1·(…)/2π={:.3} days",
+        "[encounter] M1*={m1_star:.6} rad  M1_0={m1_0:.6} rad  (M1*-M1_0)={:.6} rad  T1·(…)/2π={:.3} days",
         m1_star - m1_0,
         t1 * (m1_star - m1_0) / TAU / 86400.0
     );
     eprintln!(
-        "[encounter] M2*={m2_star:.6} rad  M20={m2_0:.6} rad  (M2*-M20)={:.6} rad  T2·(…)/2π={:.3} days",
+        "[encounter] M2*={m2_star:.6} rad  M2_0={m2_0:.6} rad  (M2*-M2_0)={:.6} rad  T2·(…)/2π={:.3} days",
         m2_star - m2_0,
         t2 * (m2_star - m2_0) / TAU / 86400.0
     );
@@ -187,17 +190,17 @@ fn find_encounter_single(
             .as_rad();
 
     // Joint 2D Newton on {f = 0, h = 0}.
-    let (E1, E2) = newton_fh(
-        e1_seed, e2_seed, spacecraft, planet, &coupling, r_soi_sq, t1, t2, m1_0, m2_0, k1, k2,
-    )?;
+    let (E1, E2) =
+        newton_fh(e1_seed, e2_seed, spacecraft, planet, &coupling, r_soi_sq, t1, t2, m1_0, m2_0, k1, k2)?;
 
-    let t_enc = if hyp1 {
+    let t_enc_offset_s = if hyp1 {
         let m1_enc = e1 * E1.sinh() - E1;
         t1 / TAU * (m1_enc - m1_0)
     } else {
         let m1_enc = E1 - e1 * E1.sin();
         t1 / TAU * (m1_enc + TAU * k1 as f64 - m1_0)
     };
+    let t_enc = t_start + chrono::Duration::nanoseconds((t_enc_offset_s * 1e9) as i64);
 
     Some(Encounter { t_enc, E1, E2, k1, k2 })
 }
@@ -254,29 +257,31 @@ fn invert_kepler_hyperbolic(m: f64, e: f64) -> f64 {
 ///
 /// Returns `None` after `SEARCH_MAX_ITER` iterations (encounter does not fit
 /// on an integer lattice, or `τ` is rational).
+
 fn search_k1_k2(t1: f64, t2: f64, alpha_star: f64, delta_alpha: f64) -> Option<(i64, i64)> {
-    let iterate_k1 = t1 <= t2;
-    for step in 0..=SEARCH_MAX_ITER {
-        for k in [step, -step] {
-            let (k1, k2) = if iterate_k1 {
-                let k1 = k;
-                let k2 = ((t1 * k1 as f64 - alpha_star) / t2).round() as i64;
-                (k1, k2)
-            } else {
-                let k2 = k;
-                let k1 = ((t2 * k2 as f64 + alpha_star) / t1).round() as i64;
-                (k1, k2)
-            };
-            if (t1 * k1 as f64 - t2 * k2 as f64 - alpha_star).abs() <= delta_alpha {
-                eprintln!(
-                    "[search] iterate_{} found (k1, k2) = ({k1}, {k2}) at step {step}",
-                    if iterate_k1 { "k1" } else { "k2" },
-                );
-                return Some((k1, k2));
-            }
-            if step == 0 {
-                break;
-            }
+    // `k1 = k2 = 0` corresponds to `t_start`; negative k values describe
+    // encounters before the mission starts, which are non-physical.
+    //
+    // For a given physical t_enc, k_i ≈ t_enc / T_i. The side with the LARGER
+    // period yields the smaller k, so iterate there — first admissible pair
+    // is hit in fewer steps.
+    let iterate_k1 = t1 >= t2;
+    for k in 0..=SEARCH_MAX_ITER {
+        let (k1, k2) = if iterate_k1 {
+            let k1 = k;
+            let k2 = ((t1 * k1 as f64 - alpha_star) / t2).round() as i64;
+            (k1, k2)
+        } else {
+            let k2 = k;
+            let k1 = ((t2 * k2 as f64 + alpha_star) / t1).round() as i64;
+            (k1, k2)
+        };
+        if (t1 * k1 as f64 - t2 * k2 as f64 - alpha_star).abs() <= delta_alpha {
+            eprintln!(
+                "[search] iterate_{} found (k1, k2) = ({k1}, {k2}) at step {k}",
+                if iterate_k1 { "k1" } else { "k2" },
+            );
+            return Some((k1, k2));
         }
     }
     None
@@ -341,13 +346,19 @@ mod tests {
     use crate::AU_IN_KM;
     use crate::config::{Config, StarSystem};
     use crate::orbit::orbit_3d::KeplerianElements;
-    use crate::soi_minima::find_soi_minima;
 
     #[test]
     fn voyager2_jupiter_encounter() {
         let config_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../config");
-        let config = Config::load_from_yaml(&format!("{config_dir}/config.yml")).unwrap();
+        let mut config = Config::load_from_yaml(&format!("{config_dir}/config.yml")).unwrap();
         let system = StarSystem::load_from_yaml(&format!("{config_dir}/system/solar.yml")).unwrap();
+
+        // Advance spacecraft's M0 from its own epoch (launch) to J2000 so the
+        // find_encounter convention (M0 at J2000) holds.
+        let dt_s = (system.t0 - config.spacecraft.t0).num_seconds() as f64;
+        let n1 = (config.spacecraft.orbit.mu / config.spacecraft.orbit.a.powi(3)).sqrt();
+        config.spacecraft.orbit.M0 =
+            (config.spacecraft.orbit.M0 + n1 * dt_s).rem_euclid(TAU);
 
         let spacecraft: Orbit3D<EllipticOrbit> =
             KeplerianElements::from(config.spacecraft.orbit).into();
@@ -358,21 +369,66 @@ mod tests {
             KeplerianElements::from(jupiter_cfg.orbit.clone()).into();
         let r_soi = jupiter_cfg.soi_radius();
 
-        let minima = find_soi_minima(&traj, &jupiter, r_soi);
-        assert!(!minima.is_empty(), "expected a geometric minimum inside Jupiter's SOI");
-
-        let enc = find_encounter(&traj, &jupiter, r_soi, &minima, config.spacecraft.t0)
+        // Search from launch (encounter is at 1979, well before J2000).
+        let enc = find_encounter(&traj, &jupiter, r_soi, config.spacecraft.t0)
             .expect("encounter expected");
         println!("Voyager 2 / Jupiter encounter: {enc:?}");
-        println!("t_enc = {:.3} days", enc.t_enc / 86400.0);
         let d = distance_sq(&traj, &jupiter, enc.E1, enc.E2).sqrt();
         println!("distance at encounter: {d:.3} km  (r_soi = {r_soi:.0} km)");
         assert!((d - r_soi).abs() / r_soi < 1e-6, "f=0 residual: d={d}, r_soi={r_soi}");
-        // Real Voyager 2 Jupiter arrival: 1979-07-09 → ≈ −7485 days from J2000.
-        let t_enc_days = enc.t_enc / 86400.0;
+
+        // Compute time from SOI entry to periapsis inside Jupiter's frame.
+        // At t_enc the spacecraft is at r_sc, v_sc heliocentric and Jupiter at
+        // r_j, v_j. Subtract to planetocentric, build the flyby hyperbola,
+        // then Kepler-equation-propagate to H = 0 (periapsis).
+        use crate::state_vectors::StateVectors;
+        use crate::angle::EccAnomaly;
+        let Trajectory::Elliptic(sc_orb) = &traj else { unreachable!() };
+        let r_sc = sc_orb.position(EccAnomaly::from(Angle::from_rad(enc.E1)));
+        let v_sc = sc_orb.velocity(EccAnomaly::from(Angle::from_rad(enc.E1)));
+        let r_j = jupiter.position(EccAnomaly::from(Angle::from_rad(enc.E2)));
+        let v_j = jupiter.velocity(EccAnomaly::from(Angle::from_rad(enc.E2)));
+        let r_rel = r_sc - r_j;
+        let v_rel = v_sc - v_j;
+        let hyp = Trajectory::from_state_vectors(jupiter_cfg.body.μ, r_rel, v_rel, 0.0);
+        let Trajectory::Hyperbolic(hyp) = &hyp else {
+            panic!("Jupiter flyby must be hyperbolic relative to Jupiter");
+        };
+        let (a_h, e_h, mu) =
+            (hyp.orbit_2d.0.a(), hyp.orbit_2d.0.e(), hyp.orbit_2d.0.mu());
+        // `from_state_vectors(…, t=0)` sets the orbit's M0 to the mean
+        // anomaly at the capture instant (SOI entry). Periapsis is M = 0, so
+        // time from SOI entry to periapsis is −M0 / n, with n = √(μ/|a|³).
+        let m_now = hyp.orbit_2d.0.M0().as_rad();
+        let n = (mu / a_h.abs().powi(3)).sqrt();
+        let t_to_periapsis = -m_now / n;
+        // Reference (NASA/JPL, Jupiter-centered hyperbola at periapsis
+        // 1979-07-09 22:29:51 ET):
+        //   a = −2,184,140 km    e = 1.330279
+        //   i = 6.913454°        Ω = 147.253921°    ω = −95.715216°
+        let (a_ref, e_ref) = (-2_184_140.0, 1.330279);
+        println!(
+            "planetocentric hyperbola: a={a_h:.3e} km (ref {a_ref:.3e}, {:+.2}%), e={e_h:.6} (ref {e_ref:.6}, {:+.2}%), time SOI→periapsis = {:.2} days",
+            100.0 * (a_h - a_ref) / a_ref,
+            100.0 * (e_h - e_ref) / e_ref,
+            t_to_periapsis / 86400.0,
+        );
+        // Voyager 2 Jupiter periapsis: 1979-07-09.
+        let periapsis_actual = Utc.with_ymd_and_hms(1979, 7, 9, 0, 0, 0).unwrap();
+        let periapsis_computed = enc.t_enc
+            + chrono::Duration::nanoseconds((t_to_periapsis * 1e9) as i64);
+        let diff_days =
+            (periapsis_computed - periapsis_actual).num_seconds() as f64 / 86400.0;
+        println!(
+            "computed periapsis = {}, actual = {}, Δ = {:+.2} days",
+            periapsis_computed, periapsis_actual, diff_days,
+        );
         assert!(
-            (t_enc_days - (-7485.0)).abs() < 200.0,
-            "expected t_enc ≈ −7485 days (1979-07-09), got {t_enc_days:.1}"
+            diff_days.abs() < 30.0,
+            "computed periapsis {} off from real {} by {:+.1} days",
+            periapsis_computed,
+            periapsis_actual,
+            diff_days,
         );
     }
 
@@ -408,18 +464,12 @@ mod tests {
         .into();
         let traj = Trajectory::Elliptic(parker);
 
-        let minima = find_soi_minima(&traj, &venus, r_soi);
-        assert!(!minima.is_empty(), "expected a geometric minimum inside Venus's SOI");
-
-        // Same epoch for both M0s (no offset).
         // Parker's epoch coincides with J2000 → t_start = system.t0.
-        let enc = find_encounter(&traj, &venus, r_soi, &minima, system.t0)
-            .expect("encounter expected");
+        let enc = find_encounter(&traj, &venus, r_soi, system.t0).expect("encounter expected");
         println!("Parker / Venus encounter: {enc:?}");
-        println!("t_enc = {:.3} years", enc.t_enc / (365.25 * 86400.0));
         let d = distance_sq(&traj, &venus, enc.E1, enc.E2).sqrt();
         println!("distance at encounter: {d:.3} km  (r_soi = {r_soi:.0} km)");
         assert!((d - r_soi).abs() / r_soi < 1e-6, "f=0 residual: d={d}, r_soi={r_soi}");
-        assert!(enc.k1 > 0 && enc.t_enc > 0.0);
+        assert!(enc.k1 > 0 && enc.t_enc > system.t0);
     }
 }

@@ -5,15 +5,15 @@ use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::UnitQuaternion;
 use astrorust_lib::AU_IN_KM;
-use astrorust_lib::angle::{EccAnomaly, HypAnomaly, IntoAnomaly};
 use astrorust_lib::config::{CelestialBody, Config, StarSystem};
-use astrorust_lib::soi_minima::find_soi_minima;
+use astrorust_lib::angle::{Angle, EccAnomaly, HypAnomaly};
+use astrorust_lib::encounter::{Encounter, find_encounter};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;
 use astrorust_lib::orbit::orbit_3d::Orbit3D;
 use astrorust_lib::state_vectors::StateVectors;
 use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
-use astrorust_lib::util::format_with_thousand_separators;
+use astrorust_lib::util::*;
 use chrono::{DateTime, Duration, Utc};
 use gui_lib::kiss3d::event::{Action, Key, WindowEvent};
 use gui_lib::kiss3d::light::Light;
@@ -53,40 +53,27 @@ const DEFAULT_TIME_WARP_INDEX: usize = 11;
 const STAR_RADIUS: f32 = 15.0;
 const PLANET_RADIUS: f32 = 7.0;
 
-/// Find the planet index whose earliest encounter is soonest after the spacecraft's current anomaly.
-#[allow(non_snake_case)]
-fn first_future_encounter(spacecraft: &Spacecraft, planets: &[Body], t: Time) -> Option<usize> {
-    let current_anomaly = match &spacecraft.trajectory {
-        Trajectory::Elliptic(elliptic) => {
-            let E: EccAnomaly =
-                elliptic.orbit_2d.0.M_from_t(t).into_anomaly(elliptic.orbit_2d.0.e());
-            eprintln!("Current spacecraft E: {}", E.as_rad());
-            E.as_rad()
-        }
-        Trajectory::Hyperbolic(hyperbolic) => {
-            let H: HypAnomaly =
-                hyperbolic.orbit_2d.0.M_from_t(t).into_anomaly(hyperbolic.orbit_2d.0.e());
-            eprintln!("Current spacecraft H: {}", *H);
-            *H
-        }
-    };
-
+/// Find the planet whose next SOI encounter is soonest after the current sim
+/// time. Returns `(planet_index, Encounter)` so the SOI-entry transition can
+/// be driven off the pre-computed `t_enc`, `E1`, `E2` rather than per-frame
+/// distance sampling (which misses encounters at high time-warp).
+fn first_future_encounter(
+    spacecraft: &Spacecraft,
+    planets: &[Body],
+    t_now: DateTime<Utc>,
+) -> Option<(usize, Encounter)> {
     planets
         .iter()
         .enumerate()
-        .find(|(_, planet)| {
-            let encounters =
-                find_soi_minima(&spacecraft.trajectory, &planet.orbit, planet.soi_radius);
-            eprintln!("Planet {} encounters: {encounters:?}", planet.body.name);
-            !encounters.is_empty()
-                && match &spacecraft.trajectory {
-                    Trajectory::Elliptic(_) => true,
-                    Trajectory::Hyperbolic(_) => {
-                        encounters.iter().any(|enc| enc.0 >= current_anomaly)
-                    }
-                }
+        .filter_map(|(i, planet)| {
+            let enc =
+                find_encounter(&spacecraft.trajectory, &planet.orbit, planet.soi_radius, t_now)?;
+            (enc.t_enc >= t_now).then_some((i, enc))
         })
-        .map(|(i, _)| i)
+        .min_by_key(|(_, enc)| enc.t_enc)
+        .inspect(|(i, enc)| {
+            eprintln!("Next encounter: {} at {}", planets[*i].body.name, enc.t_enc);
+        })
 }
 
 fn main() {
@@ -149,7 +136,7 @@ fn main() {
         rgb8_to_color(config.spacecraft.color),
         None,
     );
-    spacecraft.next_encounter = first_future_encounter(&spacecraft, &planets, t);
+    spacecraft.next_encounter = first_future_encounter(&spacecraft, &planets, planets_epoch + Duration::from(t));
     dbg!(&spacecraft.next_encounter);
 
     while window.render_with_camera(&mut camera) {
@@ -184,57 +171,110 @@ fn main() {
             spacecraft.r = r;
             spacecraft.v = v;
         }
+        let now_date = planets_epoch + Duration::from(t);
         if spacecraft.planet_idx.is_none()
-            && let Some((i, planet)) = spacecraft
-                .next_encounter
-                .iter()
-                .map(|&i| (i, &planets[i]))
-                .find(|(_, planet)| (planet.r - spacecraft.r).magnitude() <= planet.soi_radius)
+            && let Some((i, enc)) = spacecraft.next_encounter
+            && now_date >= enc.t_enc
         {
-            eprintln!("Spacecraft entering SOI of planet {}", planet.body.name);
-            let planet_v = planet.orbit.velocity(t);
+            let planet = &planets[i];
+            eprintln!("Spacecraft entering SOI of planet {} at {}", planet.body.name, enc.t_enc);
 
-            // Convert heliocentric state vectors to planetocentric
-            spacecraft.r -= planet.r;
-            spacecraft.v -= planet_v;
+            // Use the pre-computed (E1, E2) at SOI entry so the transition
+            // is deterministic regardless of frame cadence / time warp.
+            let (sc_r, sc_v) = match &spacecraft.trajectory {
+                Trajectory::Elliptic(o) => {
+                    o.position_and_velocity(EccAnomaly::from(Angle::from_rad(enc.E1)))
+                }
+                Trajectory::Hyperbolic(o) => {
+                    o.position_and_velocity(HypAnomaly::from(enc.E1))
+                }
+            };
+            let (p_r, p_v) =
+                planet.orbit.position_and_velocity(EccAnomaly::from(Angle::from_rad(enc.E2)));
 
+            // Convert heliocentric state vectors to planetocentric.
+            spacecraft.r = sc_r - p_r;
+            spacecraft.v = sc_v - p_v;
             spacecraft.planet_idx = Some(i);
-            // Calculate flyby hyperbola from new state vectors
+            spacecraft.next_encounter = None;
+            // Rebuild as a flyby hyperbola relative to the planet, timestamped
+            // at the exact encounter instant (seconds since planets_epoch).
+            let t_enc_secs =
+                (enc.t_enc - planets_epoch).num_nanoseconds().unwrap() as f64 * 1e-9;
             spacecraft.trajectory = Trajectory::from_state_vectors(
                 planet.body.μ,
                 spacecraft.r,
                 spacecraft.v,
-                t.as_secs(),
+                t_enc_secs,
             );
             spacecraft.points =
                 gui_lib::generate_trajectory_points(planet.soi_radius, &spacecraft.trajectory, 100)
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
-        } else if let Some(planet) = spacecraft.planet_idx.map(|i| &planets[i])
-            && spacecraft.r.magnitude() > planet.soi_radius
-        {
-            eprintln!("Spacecraft leaving SOI of planet {}", planet.body.name);
-            let planet_v = planet.orbit.velocity(t);
 
-            // Convert planetocentric state vectors to heliocentric
-            spacecraft.r += planet.r;
-            spacecraft.v += planet_v;
+            // Pre-compute the deterministic SOI exit: solve r(H) = r_soi on
+            // the planetocentric hyperbola, take the positive (post-periapsis)
+            // root, convert to mean anomaly, derive the absolute exit time.
+            let Trajectory::Hyperbolic(hyp) = &spacecraft.trajectory else {
+                unreachable!("planetocentric flyby is always hyperbolic")
+            };
+            let a = hyp.orbit_2d.0.a();
+            let e_hyp = hyp.orbit_2d.0.e();
+            let mu = hyp.orbit_2d.0.mu();
+            let n_hyp = (mu / a.abs().powi(3)).sqrt();
+            // M_from_t uses M0 + n·t, so M0 stored is the mean anomaly at
+            // t = 0 (J2000). Advance it to the capture instant `t_enc_secs`
+            // to get the actual M at SOI entry.
+            let m_entry = hyp.orbit_2d.0.M0().as_rad() + n_hyp * t_enc_secs;
+            let h_exit = ((1.0 - planet.soi_radius / a) / e_hyp).acosh();
+            let m_exit = e_hyp * h_exit.sinh() - h_exit;
+            let dt_exit_s = (m_exit - m_entry) / n_hyp;
+            let t_exit =
+                enc.t_enc + chrono::Duration::nanoseconds((dt_exit_s * 1e9) as i64);
+            eprintln!(
+                "SOI exit pre-computed: H_exit={h_exit:.4}, Δt={:.2} days → t_exit={t_exit}",
+                dt_exit_s / 86400.0,
+            );
+            spacecraft.soi_exit = Some((h_exit, t_exit));
+        } else if let Some((h_exit, t_exit)) = spacecraft.soi_exit
+            && now_date >= t_exit
+            && let Some(planet_idx) = spacecraft.planet_idx
+        {
+            let planet = &planets[planet_idx];
+            eprintln!("Spacecraft leaving SOI of planet {} at {t_exit}", planet.body.name);
+
+            // Use pre-computed H_exit for deterministic planetocentric state
+            // at the exit instant, regardless of frame cadence / time warp.
+            let (sc_r, sc_v) = match &spacecraft.trajectory {
+                Trajectory::Hyperbolic(o) => o.position_and_velocity(HypAnomaly::from(h_exit)),
+                Trajectory::Elliptic(_) => unreachable!("planetocentric flyby is hyperbolic"),
+            };
+            let t_exit_secs =
+                (t_exit - planets_epoch).num_nanoseconds().unwrap() as f64 * 1e-9;
+            let (p_r, p_v) = planet.orbit.position_and_velocity(Time::from_secs(t_exit_secs));
+
+            // Planetocentric → heliocentric.
+            spacecraft.r = sc_r + p_r;
+            spacecraft.v = sc_v + p_v;
 
             spacecraft.planet_idx = None;
-            // Calculate trajectory around the Sun from new state vectors
+            spacecraft.soi_exit = None;
+            // Rebuild the heliocentric trajectory from the new state at the
+            // exact SOI-exit instant (not the current frame time).
             spacecraft.trajectory = Trajectory::from_state_vectors(
                 system.star.μ,
                 spacecraft.r,
                 spacecraft.v,
-                t.as_secs(),
+                t_exit_secs,
             );
             spacecraft.points =
                 gui_lib::generate_trajectory_points(1e11, &spacecraft.trajectory, 360)
                     .iter()
                     .map(|point| point.map(|x| (scale * x) as f32))
                     .collect();
-            spacecraft.next_encounter = first_future_encounter(&spacecraft, &planets, t);
+            spacecraft.next_encounter =
+                first_future_encounter(&spacecraft, &planets, planets_epoch + Duration::from(t));
             dbg!(&spacecraft.next_encounter);
         };
         draw_orbit_and_current_position_of_spacecraft(
@@ -394,11 +434,17 @@ fn create_spacecraft(
     let node = window.add_obj(obj_path, mtl_dir, Vector3::new(1.0, 1.0, 1.0));
     let (r, v) = trajectory.position_and_velocity(Time::from_secs(0.0));
 
-    Spacecraft { node, trajectory, points, color, planet_idx, next_encounter: None, r, v }
-}
-
-fn rgb8_to_color([r, g, b]: [u8; 3]) -> Point3<f32> {
-    Point3::<f32>::new(r.into(), g.into(), b.into()) / 255.0
+    Spacecraft {
+        node,
+        trajectory,
+        points,
+        color,
+        planet_idx,
+        soi_exit: None,
+        next_encounter: None,
+        r,
+        v,
+    }
 }
 
 struct Body {
@@ -414,8 +460,12 @@ struct Body {
 struct Spacecraft {
     node: SceneNode,
     planet_idx: Option<usize>,
+    /// When inside a planet's SOI: the pre-computed (H_exit, t_exit) on the
+    /// planetocentric hyperbola. Populated at SOI entry, consumed at exit —
+    /// keeps the exit transition deterministic under high time warp.
+    soi_exit: Option<(f64, DateTime<Utc>)>,
     trajectory: Trajectory,
-    next_encounter: Option<usize>,
+    next_encounter: Option<(usize, Encounter)>,
     points: Vec<Point3<f32>>,
     color: Point3<f32>,
     r: Vector3<f64>,
