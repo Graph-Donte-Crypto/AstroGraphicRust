@@ -14,12 +14,12 @@ use crate::trajectory::Trajectory;
 use crate::util::FloatExt;
 
 const NEWTON_TOL: f64 = 1e-12;
-const NEWTON_MAX_ITER: usize = 50;
+const NEWTON_MAX_ITER: usize = 10;
 /// Upper bound on integer iterations of the (k1, k2) search. For any realistic
 /// admissible encounter the first hit lies well below this; the cap exists to
 /// bound runtime when `τ = T1/T2` is (near-)rational and no admissible pair
 /// exists at all.
-const SEARCH_MAX_ITER: i64 = 1000;
+const SEARCH_MAX_ITER: i64 = 100;
 
 /// Real SOI entry: eccentric/hyperbolic anomalies at crossing, revolution
 /// indices `(k1, k2)` satisfying the time-coupling constraint, and the
@@ -102,9 +102,14 @@ fn find_encounter_single(
     let h_m = hess.component_mul(&(inv_j * inv_j.transpose()));
 
     // Mean anomalies at the minimum.
-    let m1_star =
-        if hyp1 { e1 * E1_star.sinh() - E1_star } else { E1_star - e1 * E1_star.sin() };
+    let m1_star = if hyp1 {
+        e1 * E1_star.sinh() - E1_star
+    } else {
+        let m1_star = E1_star - e1 * E1_star.sin();
+        if m1_star < 0.0 { m1_star + TAU } else { m1_star }
+    };
     let m2_star = E2_star - e2 * E2_star.sin();
+    let m2_star = if m2_star < 0.0 { m2_star + TAU } else { m2_star };
 
     let t1 = time_scale(spacecraft);
     let t2 = time_scale_elliptic(planet);
@@ -113,7 +118,9 @@ fn find_encounter_single(
     // [0, 2π)` convention places `k1 = k2 = 0` on the first forward arc past
     // `t_start` rather than past J2000.
     let m1_0_at_tstart = m0_of(spacecraft) + TAU * t_start_s / t1;
+    let m1_0_at_tstart = if m1_0_at_tstart < 0.0 { m1_0_at_tstart + TAU } else { m1_0_at_tstart };
     let m2_0_at_tstart = planet.orbit_2d.0.M0().as_rad() + TAU * t_start_s / t2;
+    let m2_0_at_tstart = if m2_0_at_tstart < 0.0 { m2_0_at_tstart + TAU } else { m2_0_at_tstart };
     let m1_0 = m1_star - (m1_star - m1_0_at_tstart).rem_euclid(TAU);
     let m2_0 = m2_star - (m2_star - m2_0_at_tstart).rem_euclid(TAU);
 
@@ -170,6 +177,7 @@ fn find_encounter_single(
     let big_b = 2.0 * d0 * (h_m.m12 + s * h_m.m22);
     let big_c = d0 * d0 * h_m.m22 + 2.0 * f_star;
     let disc = big_b * big_b - 4.0 * big_a * big_c;
+    eprintln!("Discriminant: {disc}");
     if disc < 0.0 {
         return None;
     }
@@ -190,8 +198,9 @@ fn find_encounter_single(
             .as_rad();
 
     // Joint 2D Newton on {f = 0, h = 0}.
-    let (E1, E2) =
-        newton_fh(e1_seed, e2_seed, spacecraft, planet, &coupling, r_soi_sq, t1, t2, m1_0, m2_0, k1, k2)?;
+    let (E1, E2) = newton_fh(
+        e1_seed, e2_seed, spacecraft, planet, &coupling, r_soi_sq, t1, t2, m1_0, m2_0, k1, k2,
+    )?;
 
     let t_enc_offset_s = if hyp1 {
         let m1_enc = e1 * E1.sinh() - E1;
@@ -233,11 +242,8 @@ fn m0_of(traj: &Trajectory) -> f64 {
 /// (exact for large |M|) and falling back to `M/(e−1)` for small |M|.
 fn invert_kepler_hyperbolic(m: f64, e: f64) -> f64 {
     let seed_log = (2.0 * m.abs() / e).ln();
-    let mut h = if seed_log.is_finite() && seed_log > 1.0 {
-        m.signum() * seed_log
-    } else {
-        m / (e - 1.0)
-    };
+    let mut h =
+        if seed_log.is_finite() && seed_log > 1.0 { m.signum() * seed_log } else { m / (e - 1.0) };
     for _ in 0..50 {
         let (sh, ch) = h.sinh_cosh();
         let dh = -(e * sh - h - m) / (e * ch - 1.0);
@@ -258,29 +264,31 @@ fn invert_kepler_hyperbolic(m: f64, e: f64) -> f64 {
 /// Returns `None` after `SEARCH_MAX_ITER` iterations (encounter does not fit
 /// on an integer lattice, or `τ` is rational).
 
-fn search_k1_k2(t1: f64, t2: f64, alpha_star: f64, delta_alpha: f64) -> Option<(i64, i64)> {
+fn search_k1_k2(
+    mut T1: f64,
+    mut T2: f64,
+    mut alpha_star: f64,
+    delta_alpha: f64,
+) -> Option<(i64, i64)> {
     // `k1 = k2 = 0` corresponds to `t_start`; negative k values describe
     // encounters before the mission starts, which are non-physical.
     //
     // For a given physical t_enc, k_i ≈ t_enc / T_i. The side with the LARGER
     // period yields the smaller k, so iterate there — first admissible pair
     // is hit in fewer steps.
-    let iterate_k1 = t1 >= t2;
-    for k in 0..=SEARCH_MAX_ITER {
-        let (k1, k2) = if iterate_k1 {
-            let k1 = k;
-            let k2 = ((t1 * k1 as f64 - alpha_star) / t2).round() as i64;
-            (k1, k2)
-        } else {
-            let k2 = k;
-            let k1 = ((t2 * k2 as f64 + alpha_star) / t1).round() as i64;
-            (k1, k2)
-        };
-        if (t1 * k1 as f64 - t2 * k2 as f64 - alpha_star).abs() <= delta_alpha {
-            eprintln!(
-                "[search] iterate_{} found (k1, k2) = ({k1}, {k2}) at step {k}",
-                if iterate_k1 { "k1" } else { "k2" },
-            );
+
+    let mut swap = false;
+    if T1 < T2 {
+        std::mem::swap(&mut T1, &mut T2);
+        alpha_star = -alpha_star;
+        swap = true;
+    }
+
+    for k1 in 0..=SEARCH_MAX_ITER {
+        let k2 = ((T1 * k1 as f64 - alpha_star) / T2).round() as i64;
+        if (T1 * k1 as f64 - T2 * k2 as f64 - alpha_star).abs() <= delta_alpha {
+            let (k1, k2) = if swap { (k2, k1) } else { (k1, k2) };
+            eprintln!("[search] iteration found (k1, k2) = ({k1}, {k2}) at step {k1}");
             return Some((k1, k2));
         }
     }
@@ -308,6 +316,15 @@ fn newton_fh(
     let hyp1 = spacecraft.is_hyperbolic();
     let alpha = t1 * k1 as f64 - t2 * k2 as f64;
 
+    E1 %= TAU;
+    E2 %= TAU;
+    if E1 < 0.0 {
+        E1 += TAU;
+    }
+    if E2 < 0.0 {
+        E2 += TAU;
+    }
+
     for _ in 0..NEWTON_MAX_ITER {
         let (grad_f, _hess) = gradient_hessian_at(E1, E2, spacecraft, planet, coupling);
         let d2 = distance_sq(spacecraft, planet, E1, E2);
@@ -323,6 +340,7 @@ fn newton_fh(
 
         let jac = Matrix2::new(grad_f.x, grad_f.y, t1 * j1, -t2 * j2);
         let det = jac.determinant();
+        eprintln!("det = {det}");
         if det.abs() < f64::EPSILON {
             return None;
         }
@@ -332,6 +350,7 @@ fn newton_fh(
 
         E1 += dE1;
         E2 += dE2;
+        eprintln!("Newton: E1={E1}; E2={E2}");
 
         if dE1.abs() < NEWTON_TOL && dE2.abs() < NEWTON_TOL {
             return Some((E1, E2));
@@ -357,8 +376,7 @@ mod tests {
         // find_encounter convention (M0 at J2000) holds.
         let dt_s = (system.t0 - config.spacecraft.t0).num_seconds() as f64;
         let n1 = (config.spacecraft.orbit.mu / config.spacecraft.orbit.a.powi(3)).sqrt();
-        config.spacecraft.orbit.M0 =
-            (config.spacecraft.orbit.M0 + n1 * dt_s).rem_euclid(TAU);
+        config.spacecraft.orbit.M0 = (config.spacecraft.orbit.M0 + n1 * dt_s).rem_euclid(TAU);
 
         let spacecraft: Orbit3D<EllipticOrbit> =
             KeplerianElements::from(config.spacecraft.orbit).into();
@@ -381,8 +399,8 @@ mod tests {
         // At t_enc the spacecraft is at r_sc, v_sc heliocentric and Jupiter at
         // r_j, v_j. Subtract to planetocentric, build the flyby hyperbola,
         // then Kepler-equation-propagate to H = 0 (periapsis).
-        use crate::state_vectors::StateVectors;
         use crate::angle::EccAnomaly;
+        use crate::state_vectors::StateVectors;
         let Trajectory::Elliptic(sc_orb) = &traj else { unreachable!() };
         let r_sc = sc_orb.position(EccAnomaly::from(Angle::from_rad(enc.E1)));
         let v_sc = sc_orb.velocity(EccAnomaly::from(Angle::from_rad(enc.E1)));
@@ -394,8 +412,7 @@ mod tests {
         let Trajectory::Hyperbolic(hyp) = &hyp else {
             panic!("Jupiter flyby must be hyperbolic relative to Jupiter");
         };
-        let (a_h, e_h, mu) =
-            (hyp.orbit_2d.0.a(), hyp.orbit_2d.0.e(), hyp.orbit_2d.0.mu());
+        let (a_h, e_h, mu) = (hyp.orbit_2d.0.a(), hyp.orbit_2d.0.e(), hyp.orbit_2d.0.mu());
         // `from_state_vectors(…, t=0)` sets the orbit's M0 to the mean
         // anomaly at the capture instant (SOI entry). Periapsis is M = 0, so
         // time from SOI entry to periapsis is −M0 / n, with n = √(μ/|a|³).
@@ -415,10 +432,9 @@ mod tests {
         );
         // Voyager 2 Jupiter periapsis: 1979-07-09.
         let periapsis_actual = Utc.with_ymd_and_hms(1979, 7, 9, 0, 0, 0).unwrap();
-        let periapsis_computed = enc.t_enc
-            + chrono::Duration::nanoseconds((t_to_periapsis * 1e9) as i64);
-        let diff_days =
-            (periapsis_computed - periapsis_actual).num_seconds() as f64 / 86400.0;
+        let periapsis_computed =
+            enc.t_enc + chrono::Duration::nanoseconds((t_to_periapsis * 1e9) as i64);
+        let diff_days = (periapsis_computed - periapsis_actual).num_seconds() as f64 / 86400.0;
         println!(
             "computed periapsis = {}, actual = {}, Δ = {:+.2} days",
             periapsis_computed, periapsis_actual, diff_days,

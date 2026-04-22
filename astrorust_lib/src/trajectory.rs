@@ -18,6 +18,13 @@ impl Trajectory {
         matches!(self, Self::Hyperbolic(_))
     }
 
+    pub fn period(&self) -> Option<f64> {
+        match self {
+            Trajectory::Elliptic(orbit) => Some(orbit.period().as_secs()),
+            Trajectory::Hyperbolic(_) => None,
+        }
+    }
+
     pub fn periapsis(&self) -> f64 {
         match self {
             Trajectory::Elliptic(orbit3_d) => orbit3_d.periapsis(),

@@ -21,12 +21,20 @@ spacecraft:
     # M0: 6.26898
 
     # Voayager 2 from Horizon state vectors just before Jupiter arrival
-    a: 546095282.4529687
+    # a: 546095282.4529687
+    # e: 0.7331215656362654
+    # i: 5.015
+    # Ω: -32.9834163461
+    # ω: 12.2919523634
+    # M0: 6.25059
+
+    # Voyager 2 modified to test numerical instability
+    a: 547096282.4529687
     e: 0.7331215656362654
-    i: 5.015
+    i: 5.013
     Ω: -32.9834163461
     ω: 12.2919523634
-    M0: 6.25059
+    M0: 6.0
 
     #M0: 6.2676797497
     #

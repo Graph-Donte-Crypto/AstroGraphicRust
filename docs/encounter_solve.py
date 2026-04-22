@@ -10,7 +10,8 @@ Pipeline:
 """
 
 from __future__ import annotations
-import math from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Callable, Iterator, Optional
 
