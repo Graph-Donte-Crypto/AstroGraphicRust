@@ -11,3 +11,5 @@ perf.data.old
 
 **/.venv
 **/__pycache__
+
+.claude/

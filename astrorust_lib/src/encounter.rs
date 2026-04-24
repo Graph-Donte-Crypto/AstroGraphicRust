@@ -345,14 +345,14 @@ fn newton_fh(
             return None;
         }
         // Cramer: [dE1; dE2] = −J⁻¹ [f; h].
-        let dE1 = -(f * jac.m22 - h * jac.m12) / det;
-        let dE2 = -(h * jac.m11 - f * jac.m21) / det;
+        let dE1: f64 = -(f * jac.m22 - h * jac.m12) / det;
+        let dE2: f64 = -(h * jac.m11 - f * jac.m21) / det;
 
         E1 += dE1;
         E2 += dE2;
-        eprintln!("Newton: E1={E1}; E2={E2}");
+        eprintln!("Newton: E1={E1}; E2={E2}, dE1={dE1:+e}, dE2={dE2:+e}");
 
-        if dE1.abs() < NEWTON_TOL && dE2.abs() < NEWTON_TOL {
+        if dE1 * dE1 < NEWTON_TOL && dE2 * dE2 < NEWTON_TOL {
             return Some((E1, E2));
         }
     }
