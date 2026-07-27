@@ -1,6 +1,5 @@
 use astrorust_gui_lib as gui_lib;
 use astrorust_gui_lib::kiss3d::camera::Camera;
-use astrorust_gui_lib::kiss3d::nalgebra::Point2;
 use astrorust_gui_lib::kiss3d::scene::SceneNode;
 use astrorust_gui_lib::kiss3d::text::Font;
 use astrorust_gui_lib::na::UnitQuaternion;
@@ -15,17 +14,35 @@ use astrorust_lib::time::Time;
 use astrorust_lib::trajectory::Trajectory;
 use astrorust_lib::util::*;
 use chrono::{DateTime, Duration, Utc};
-use gui_lib::kiss3d::event::{Action, Key, WindowEvent};
+use gui_lib::kiss3d::event::{Action, Key, MouseButton, WindowEvent};
 use gui_lib::kiss3d::light::Light;
 use gui_lib::kiss3d::nalgebra as na;
 use gui_lib::kiss3d::window::Window;
-use na::{Point3, Translation3, Vector3};
+use kiss3d::camera::ArcBall;
+use na::{Point2, Point3, Translation3, Vector2, Vector3};
 use std::f64::consts::TAU;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Instant;
 
+const TEXT_SIZE: f32 = 30.0;
 const CAMERA_ACCELERATION: f64 = 0.0;
+/// Zoom-out limit, in multiples of the system radius (outermost apoapsis).
+const CAMERA_MAX_DIST_FACTOR: f64 = 2.0;
+/// Extra far plane headroom past the zoom-out limit, in multiples of the system radius.
+const CAMERA_ZFAR_MARGIN: f64 = 1.5;
+/// Near clipping plane. Large enough to keep depth buffer precision at solar-system scale.
+const CAMERA_ZNEAR: f32 = 1.0;
+/// Radians of camera rotation per pixel of mouse drag. ArcBall's own default is 0.005.
+const CAMERA_ROTATE_SENSITIVITY: f32 = 0.002;
+/// Distance multiplier per unit of scroll. Below 1 so that scrolling up zooms in.
+const CAMERA_ZOOM_STEP: f32 = 1.0 / 1.01;
+/// Longest gap between two left clicks that still counts as a double click.
+const DOUBLE_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(400);
+/// Furthest the cursor may travel between two clicks for them to count as a double click, in px.
+const DOUBLE_CLICK_SLACK: f32 = 6.0;
+/// Screen-space radius around a body within which a double click selects it, in px.
+const PICK_RADIUS: f32 = 30.0;
 const TIME_WARP_STEPS: [i64; 21] = [
     -1_000_000_000,
     -100_000_000,
@@ -76,13 +93,9 @@ fn first_future_encounter(
         })
 }
 
-fn main() {
-    // TODO: remove after migration to newer winit without wayland bug
-    unsafe {
-        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
-    }
-    let mut window = Window::new("Astro Graphic Rust");
-
+#[kiss3d::main]
+async fn main() {
+    let mut window = Window::new("AstroGraphicRust");
     let mut config = Config::load_from_yaml("config/config.yml").unwrap();
     let system = config.system.to_lowercase();
     let system = StarSystem::load_from_yaml(&format!("config/system/{system}.yml")).unwrap();
@@ -106,12 +119,35 @@ fn main() {
     window.set_line_width(3.0);
     window.set_framerate_limit(Some(60));
 
-    let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
-        &Point3::from([0.0, -500.0, 300.0]),
-        &Point3::origin(),
-        &Vector3::from([0.0, 0.0, std::f32::consts::PI]),
+    // let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
+    //     Point3::from([0.0, -500.0, 300.0]),
+    //     &Point3::origin(),
+    //     &Vector3::from([0.0, 0.0, std::f32::consts::PI]),
+    // );
+    // Default ArcBall frustum (zfar = 1000) clips everything past Mars at our scale, so size the
+    // far plane from the apoapsis of the outermost planet. zfar is measured from the camera, not
+    // from the origin, so it must cover the zoom-out limit plus the far side of the system.
+    // znear is kept well above 0 to preserve depth buffer precision.
+    let system_radius =
+        scale * planets.iter().map(|planet| planet.orbit.apoapsis()).fold(0.0, f64::max);
+    let max_dist = CAMERA_MAX_DIST_FACTOR * system_radius;
+    let zfar = (max_dist + CAMERA_ZFAR_MARGIN * system_radius) as f32;
+    let mut camera = ArcBall::new_with_frustum(
+        std::f32::consts::FRAC_PI_4,
+        CAMERA_ZNEAR,
+        zfar,
+        Point3::from([0.0, -500.0, 300.0]),
+        Point3::origin(),
     );
-    let hud_font = load_ttf_font_from_current_dir();
+    camera.set_max_dist(max_dist as f32);
+    // ArcBall's rotation speed (yaw_step / pitch_step) is not configurable, so unbind its rotate
+    // button and drive yaw/pitch from the event loop below at our own sensitivity instead.
+    // Cursor tracking stays with ArcBall, so panning is unaffected.
+    camera.rebind_rotate_button(None);
+    let mut cursor_pos: Option<Point2<f32>> = None;
+    let mut is_rotating = false;
+    let mut last_click: Option<(Instant, Point2<f32>)> = None;
+    let hud_font = Arc::new(load_ttf_font_from_current_dir());
 
     let planets_epoch = system.t0;
     let started_at_date =
@@ -140,14 +176,51 @@ fn main() {
         first_future_encounter(&spacecraft, &planets, planets_epoch + Duration::from(t));
     dbg!(&spacecraft.next_encounter);
 
-    while window.render_with_camera(&mut camera) {
-        for event in window.events().iter() {
+    while window.render_with_camera(&mut camera).await {
+        for mut event in window.events().iter() {
             match event.value {
                 WindowEvent::Key(Key::RBracket, Action::Press, _) => {
                     time_warp_index = (time_warp_index + 1).min(TIME_WARP_STEPS.len() - 1);
                 }
                 WindowEvent::Key(Key::LBracket, Action::Press, _) => {
                     time_warp_index = time_warp_index.saturating_sub(1);
+                }
+                WindowEvent::MouseButton(MouseButton::Button1, action, _) => {
+                    is_rotating = action == Action::Press;
+                    if let (Action::Press, Some(pos)) = (action, cursor_pos) {
+                        let now = Instant::now();
+                        let is_double_click = last_click.is_some_and(|(at, previous_pos)| {
+                            now - at < DOUBLE_CLICK_TIMEOUT
+                                && (pos - previous_pos).norm() < DOUBLE_CLICK_SLACK
+                        });
+                        if is_double_click {
+                            let screen_size = window.size().map(|x| x as f32);
+                            if let Some(body) =
+                                pick_body(&camera, &planets, &spacecraft, scale, pos, screen_size)
+                            {
+                                camera.set_at(body);
+                            }
+                        }
+                        // A double click must not also start a triple one.
+                        last_click = (!is_double_click).then_some((now, pos));
+                    }
+                }
+                WindowEvent::CursorPos(x, y, _) => {
+                    let pos = Point2::new(x as f32, y as f32);
+                    if let (true, Some(previous_pos)) = (is_rotating, cursor_pos) {
+                        let dpos = pos - previous_pos;
+                        camera.set_yaw(camera.yaw() + dpos.x * CAMERA_ROTATE_SENSITIVITY);
+                        camera.set_pitch(camera.pitch() - dpos.y * CAMERA_ROTATE_SENSITIVITY);
+                    }
+                    cursor_pos = Some(pos);
+                }
+                WindowEvent::Scroll(_, off, _) => {
+                    // ArcBall zooms towards the cursor, which drags `at` sideways whenever the
+                    // cursor is off-centre. Inhibit it and scale the distance directly, so the
+                    // focus point stays put.
+                    event.inhibited = true;
+                    let dist = camera.dist() * CAMERA_ZOOM_STEP.powf(off as f32);
+                    camera.set_dist(dist);
                 }
                 _ => {}
             }
@@ -257,7 +330,8 @@ fn main() {
                 Trajectory::Elliptic(_) => unreachable!("planetocentric flyby is hyperbolic"),
             };
             let t_exit_secs = (t_exit - planets_epoch).as_seconds_f64();
-            let (planet_r, planet_v) = planet.orbit.position_and_velocity(Time::from_secs(t_exit_secs));
+            let (planet_r, planet_v) =
+                planet.orbit.position_and_velocity(Time::from_secs(t_exit_secs));
 
             spacecraft.planet_idx = None;
             spacecraft.soi_exit = None;
@@ -294,14 +368,55 @@ fn main() {
         );
 
         if CAMERA_ACCELERATION > f64::EPSILON {
-            camera.frame.set_eye(
-                &(&eye
-                    + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32
-                        * eye.coords.normalize()),
-                &Vector3::new(0.0, 0.0, 1.0),
+            let at = camera.at();
+            camera.set_up_axis(Vector3::new(0.0, 0.0, 1.0));
+            camera.look_at(
+                eye + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32 * eye.coords.normalize(),
+                at,
             );
         }
     }
+}
+
+/// Position of the spacecraft relative to the star. Inside a planet's SOI its state vector is
+/// planetocentric, so the planet's own position has to be added back.
+fn heliocentric_r(spacecraft: &Spacecraft, planets: &[Body]) -> Vector3<f64> {
+    match spacecraft.planet_idx {
+        Some(i) => spacecraft.r + planets[i].r,
+        None => spacecraft.r,
+    }
+}
+
+/// Returns the world position of the star, a planet or the spacecraft drawn closest to `cursor` on
+/// screen, as long as it is within [`PICK_RADIUS`]. Bodies behind the camera are ignored: `project`
+/// divides by a negative w for those and would otherwise report a bogus, sometimes very close,
+/// screen position.
+fn pick_body(
+    camera: &ArcBall,
+    planets: &[Body],
+    spacecraft: &Spacecraft,
+    scale: f64,
+    cursor: Point2<f32>,
+    screen_size: Vector2<f32>,
+) -> Option<Point3<f32>> {
+    let star = std::iter::once(Point3::origin());
+    let spacecraft = std::iter::once(Point3::from(
+        heliocentric_r(spacecraft, planets).map(|x| (scale * x) as f32),
+    ));
+    let planets = planets.iter().map(|planet| Point3::from(planet.r.map(|x| (scale * x) as f32)));
+    star.chain(planets)
+        .chain(spacecraft)
+        .filter(|body| (camera.view_transform() * body).z < 0.0)
+        .map(|body| {
+            let projected = camera.project(&body, &screen_size);
+            // `project` measures y upwards from the bottom, cursor coordinates downwards from
+            // the top.
+            let projected = Point2::new(projected.x, screen_size.y - projected.y);
+            (body, (projected - cursor).norm())
+        })
+        .filter(|&(_, distance)| distance < PICK_RADIUS)
+        .min_by(|(_, a), (_, b)| a.total_cmp(b))
+        .map(|(body, _)| body)
 }
 
 fn draw_orbit_and_current_position(
@@ -326,7 +441,7 @@ fn draw_orbit_and_current_position_of_spacecraft(
     spacecraft: &mut Spacecraft,
     t: Time,
     epoch: DateTime<Utc>,
-    hud_font: &Rc<Font>,
+    hud_font: &Arc<Font>,
     time_warp: i64,
     planets: &[Body],
 ) {
@@ -334,17 +449,17 @@ fn draw_orbit_and_current_position_of_spacecraft(
         Trajectory::Elliptic(_) => false,
         Trajectory::Hyperbolic(_) => true,
     };
-    let heliocentric_r = if let Some(i) = spacecraft.planet_idx {
-        let planet_r = planets[i].r;
-
-        let points: Vec<_> =
-            spacecraft.points.iter().map(|p| p + (scale * planet_r).map(|x| x as f32)).collect();
+    if let Some(i) = spacecraft.planet_idx {
+        let points: Vec<_> = spacecraft
+            .points
+            .iter()
+            .map(|p| p + (scale * planets[i].r).map(|x| x as f32))
+            .collect();
         gui_lib::draw_orbit_points(window, &points, &spacecraft.color, is_hyperbolic);
-        spacecraft.r + planet_r
     } else {
         gui_lib::draw_orbit_points(window, &spacecraft.points, &spacecraft.color, is_hyperbolic);
-        spacecraft.r
     };
+    let heliocentric_r = heliocentric_r(spacecraft, planets);
 
     let scaled_position = heliocentric_r.map(|x| (scale * x) as f32);
     spacecraft.node.set_local_translation(Translation3 { vector: scaled_position });
@@ -371,18 +486,17 @@ fn draw_orbit_and_current_position_of_spacecraft(
         soi = spacecraft.planet_idx.map_or("Sun", |i| &planets[i].body.name),
         orbit = spacecraft.trajectory
     );
-    let text_scale = 50.0;
     window.draw_text(
         &telemetry_text,
         &Point2::new(0.0, 0.0),
-        text_scale,
-        hud_font,
+        TEXT_SIZE,
+        &hud_font,
         &Point3::new(1.0, 1.0, 1.0),
     );
     window.draw_text(
         &orbit_text,
-        &Point2::new(0.0, text_scale * 5.0),
-        text_scale,
+        &Point2::new(0.0, TEXT_SIZE * 5.0),
+        TEXT_SIZE,
         hud_font,
         &Point3::new(1.0, 1.0, 1.0),
     );
@@ -396,7 +510,7 @@ fn format_signed_warp(time_warp: i64) -> String {
     }
 }
 
-fn load_ttf_font_from_current_dir() -> Rc<Font> {
+fn load_ttf_font_from_current_dir() -> Font {
     let font_path = Path::new("OpenSans-Regular.ttf");
     Font::new(font_path).unwrap_or_else(|| panic!("failed to load {}", font_path.display()))
 }

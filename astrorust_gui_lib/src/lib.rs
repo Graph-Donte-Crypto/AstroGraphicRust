@@ -45,7 +45,6 @@ pub fn generate_hyperbola_points(
         / (orbit.orbit_2d.0.a() * orbit.orbit_2d.0.e()))
     .acosh();
     let H_min = -H_max;
-    dbg!(soi_radius, H_min, H_max);
     let mut H = H_min;
     let mut points = Vec::with_capacity(count);
     let dH = 2.0 * H_max / (count as f64);

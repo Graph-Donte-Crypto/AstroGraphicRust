@@ -15,7 +15,7 @@ path = "src/lib.rs"
 chrono = { version = "0.4.43", default-features = false, features = ["serde"] }
 derive_builder = "0.20.2"
 getset = "0.1.3"
-nalgebra = "0.26.2"
+nalgebra = "0.34"
 num-traits = "0.2.19"
 roots = "0.0.8"
 typenum = "1.17.0"
