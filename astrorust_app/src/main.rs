@@ -144,14 +144,7 @@ async fn main() {
     // button and drive yaw/pitch from the event loop below at our own sensitivity instead.
     // Cursor tracking stays with ArcBall, so panning is unaffected.
     camera.rebind_rotate_button(None);
-    let mut cursor_pos: Option<Point2<f32>> = None;
-    let mut is_rotating = false;
-    // Total cursor travel since the left button went down. Compared against CLICK_SLACK to tell a
-    // click apart from a drag; straight-line distance would misread a drag that happens to end
-    // where it started as a click.
-    let mut drag_travel = 0.0;
-    // Owned rather than borrowed from `planets`, which is mutated every frame.
-    let mut focus: Option<(String, Instant)> = None;
+    let mut input = Input::default();
     let hud_font = Arc::new(load_ttf_font_from_current_dir());
 
     let planets_epoch = system.t0;
@@ -182,61 +175,16 @@ async fn main() {
     dbg!(&spacecraft.next_encounter);
 
     while window.render_with_camera(&mut camera).await {
-        for mut event in window.events().iter() {
-            match event.value {
-                WindowEvent::Key(Key::RBracket, Action::Press, _) => {
-                    time_warp_index = (time_warp_index + 1).min(TIME_WARP_STEPS.len() - 1);
-                }
-                WindowEvent::Key(Key::LBracket, Action::Press, _) => {
-                    time_warp_index = time_warp_index.saturating_sub(1);
-                }
-                WindowEvent::MouseButton(MouseButton::Button1, action, _) => {
-                    is_rotating = action == Action::Press;
-                    match action {
-                        Action::Press => drag_travel = 0.0,
-                        // Releasing without having moved is a click: focus whatever is under it.
-                        Action::Release if drag_travel < CLICK_SLACK => {
-                            let screen_size = window.size().map(|x| x as f32);
-                            let picked = cursor_pos.and_then(|pos| {
-                                pick_body(
-                                    &camera,
-                                    &system.star.name,
-                                    &planets,
-                                    &spacecraft,
-                                    scale,
-                                    pos,
-                                    screen_size,
-                                )
-                            });
-                            if let Some((name, position)) = picked {
-                                camera.set_at(position);
-                                focus = Some((name.to_owned(), Instant::now()));
-                            }
-                        }
-                        Action::Release => {}
-                    }
-                }
-                WindowEvent::CursorPos(x, y, _) => {
-                    let pos = Point2::new(x as f32, y as f32);
-                    if let (true, Some(previous_pos)) = (is_rotating, cursor_pos) {
-                        let dpos = pos - previous_pos;
-                        drag_travel += dpos.norm();
-                        camera.set_yaw(camera.yaw() + dpos.x * CAMERA_ROTATE_SENSITIVITY);
-                        camera.set_pitch(camera.pitch() - dpos.y * CAMERA_ROTATE_SENSITIVITY);
-                    }
-                    cursor_pos = Some(pos);
-                }
-                WindowEvent::Scroll(_, off, _) => {
-                    // ArcBall zooms towards the cursor, which drags `at` sideways whenever the
-                    // cursor is off-centre. Inhibit it and scale the distance directly, so the
-                    // focus point stays put.
-                    event.inhibited = true;
-                    let dist = camera.dist() * CAMERA_ZOOM_STEP.powf(off as f32);
-                    camera.set_dist(dist);
-                }
-                _ => {}
-            }
-        }
+        handle_events(
+            &window,
+            &mut camera,
+            &mut input,
+            &mut time_warp_index,
+            &system.star.name,
+            &planets,
+            &spacecraft,
+            scale,
+        );
 
         // gui_lib::draw_full_axes(&mut window, 100.0, STAR_RADIUS);
         let eye = camera.eye();
@@ -379,8 +327,8 @@ async fn main() {
             &planets,
         );
 
-        focus = focus.filter(|(_, since)| since.elapsed() < FOCUS_LABEL_TIMEOUT);
-        if let Some((name, _)) = &focus {
+        input.focus = input.focus.filter(|(_, since)| since.elapsed() < FOCUS_LABEL_TIMEOUT);
+        if let Some((name, _)) = &input.focus {
             draw_focus_label(&mut window, name, &hud_font);
         }
 
@@ -391,6 +339,88 @@ async fn main() {
                 eye + (0.5 * CAMERA_ACCELERATION * real_t * real_t) as f32 * eye.coords.normalize(),
                 at,
             );
+        }
+    }
+}
+
+/// Mouse state that has to survive between events and between frames.
+#[derive(Default)]
+struct Input {
+    cursor_pos: Option<Point2<f32>>,
+    is_rotating: bool,
+    /// Total cursor travel since the left button went down. Compared against [`CLICK_SLACK`] to
+    /// tell a click apart from a drag; straight-line distance would misread a drag that happens
+    /// to end where it started as a click.
+    drag_travel: f32,
+    /// Focused body and when it was selected, to expire the label. The name is owned because
+    /// `planets` is mutated every frame and cannot stay borrowed across one.
+    focus: Option<(String, Instant)>,
+}
+
+#[expect(clippy::too_many_arguments, reason = "picking needs the whole scene")]
+fn handle_events(
+    window: &Window,
+    camera: &mut ArcBall,
+    input: &mut Input,
+    time_warp_index: &mut usize,
+    star_name: &str,
+    planets: &[Body],
+    spacecraft: &Spacecraft,
+    scale: f64,
+) {
+    for mut event in window.events().iter() {
+        match event.value {
+            WindowEvent::Key(Key::RBracket, Action::Press, _) => {
+                *time_warp_index = (*time_warp_index + 1).min(TIME_WARP_STEPS.len() - 1);
+            }
+            WindowEvent::Key(Key::LBracket, Action::Press, _) => {
+                *time_warp_index = time_warp_index.saturating_sub(1);
+            }
+            WindowEvent::MouseButton(MouseButton::Button1, action, _) => {
+                input.is_rotating = action == Action::Press;
+                match action {
+                    Action::Press => input.drag_travel = 0.0,
+                    // Releasing without having moved is a click: focus whatever is under it.
+                    Action::Release if input.drag_travel < CLICK_SLACK => {
+                        let screen_size = window.size().map(|x| x as f32);
+                        let picked = input.cursor_pos.and_then(|pos| {
+                            pick_body(
+                                camera,
+                                star_name,
+                                planets,
+                                spacecraft,
+                                scale,
+                                pos,
+                                screen_size,
+                            )
+                        });
+                        if let Some((name, position)) = picked {
+                            camera.set_at(position);
+                            input.focus = Some((name.to_owned(), Instant::now()));
+                        }
+                    }
+                    Action::Release => {}
+                }
+            }
+            WindowEvent::CursorPos(x, y, _) => {
+                let pos = Point2::new(x as f32, y as f32);
+                if let (true, Some(previous_pos)) = (input.is_rotating, input.cursor_pos) {
+                    let dpos = pos - previous_pos;
+                    input.drag_travel += dpos.norm();
+                    camera.set_yaw(camera.yaw() + dpos.x * CAMERA_ROTATE_SENSITIVITY);
+                    camera.set_pitch(camera.pitch() - dpos.y * CAMERA_ROTATE_SENSITIVITY);
+                }
+                input.cursor_pos = Some(pos);
+            }
+            WindowEvent::Scroll(_, off, _) => {
+                // ArcBall zooms towards the cursor, which drags `at` sideways whenever the
+                // cursor is off-centre. Inhibit it and scale the distance directly, so the
+                // focus point stays put.
+                event.inhibited = true;
+                let dist = camera.dist() * CAMERA_ZOOM_STEP.powf(off as f32);
+                camera.set_dist(dist);
+            }
+            _ => {}
         }
     }
 }
