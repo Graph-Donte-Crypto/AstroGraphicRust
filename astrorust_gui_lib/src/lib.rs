@@ -1,5 +1,4 @@
-pub use kiss3d::nalgebra as na;
-pub use {kiss3d, kiss3d_trackball};
+pub use kiss3d::{self, nalgebra as na};
 
 use astrorust_lib::angle::{Angle, EccAnomaly, HypAnomaly};
 use astrorust_lib::orbit::flat::elliptic::EllipticOrbit;

@@ -5,8 +5,7 @@ resolver = "3"
 [workspace.dependencies]
 kiss3d = { version = "0.37.2", default-features = false }
 
-# Fork making the `image` dependency optional; also applies to kiss3d-trackball's
-# own kiss3d dependency, so only one copy of the crate ends up in the graph.
+# Fork making the `image` dependency optional
 [patch.crates-io]
 kiss3d = { git = "https://github.com/Logarithmus/kiss3d", branch = "image-optional" }
 

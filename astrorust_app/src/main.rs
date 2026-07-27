@@ -37,12 +37,17 @@ const CAMERA_ZNEAR: f32 = 1.0;
 const CAMERA_ROTATE_SENSITIVITY: f32 = 0.002;
 /// Distance multiplier per unit of scroll. Below 1 so that scrolling up zooms in.
 const CAMERA_ZOOM_STEP: f32 = 1.0 / 1.01;
-/// Longest gap between two left clicks that still counts as a double click.
-const DOUBLE_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(400);
-/// Furthest the cursor may travel between two clicks for them to count as a double click, in px.
-const DOUBLE_CLICK_SLACK: f32 = 6.0;
-/// Screen-space radius around a body within which a double click selects it, in px.
+/// Furthest the cursor may travel between press and release for it to count as a click rather
+/// than a camera drag, in px.
+const CLICK_SLACK: f32 = 6.0;
+/// Screen-space radius around a body within which a click selects it, in px.
 const PICK_RADIUS: f32 = 30.0;
+/// How long the "Focus: ..." label stays on screen after a body is selected.
+const FOCUS_LABEL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+/// Rough width of one glyph as a fraction of the font size, used to centre the focus label.
+const FOCUS_LABEL_CHAR_WIDTH: f32 = 0.5;
+/// Name shown for the spacecraft, which unlike the celestial bodies has none in the config.
+const SPACECRAFT_NAME: &str = "Spacecraft";
 const TIME_WARP_STEPS: [i64; 21] = [
     -1_000_000_000,
     -100_000_000,
@@ -119,11 +124,6 @@ async fn main() {
     window.set_line_width(3.0);
     window.set_framerate_limit(Some(60));
 
-    // let mut camera = gui_lib::kiss3d_trackball::Trackball::new(
-    //     Point3::from([0.0, -500.0, 300.0]),
-    //     &Point3::origin(),
-    //     &Vector3::from([0.0, 0.0, std::f32::consts::PI]),
-    // );
     // Default ArcBall frustum (zfar = 1000) clips everything past Mars at our scale, so size the
     // far plane from the apoapsis of the outermost planet. zfar is measured from the camera, not
     // from the origin, so it must cover the zoom-out limit plus the far side of the system.
@@ -146,7 +146,12 @@ async fn main() {
     camera.rebind_rotate_button(None);
     let mut cursor_pos: Option<Point2<f32>> = None;
     let mut is_rotating = false;
-    let mut last_click: Option<(Instant, Point2<f32>)> = None;
+    // Total cursor travel since the left button went down. Compared against CLICK_SLACK to tell a
+    // click apart from a drag; straight-line distance would misread a drag that happens to end
+    // where it started as a click.
+    let mut drag_travel = 0.0;
+    // Owned rather than borrowed from `planets`, which is mutated every frame.
+    let mut focus: Option<(String, Instant)> = None;
     let hud_font = Arc::new(load_ttf_font_from_current_dir());
 
     let planets_epoch = system.t0;
@@ -187,28 +192,35 @@ async fn main() {
                 }
                 WindowEvent::MouseButton(MouseButton::Button1, action, _) => {
                     is_rotating = action == Action::Press;
-                    if let (Action::Press, Some(pos)) = (action, cursor_pos) {
-                        let now = Instant::now();
-                        let is_double_click = last_click.is_some_and(|(at, previous_pos)| {
-                            now - at < DOUBLE_CLICK_TIMEOUT
-                                && (pos - previous_pos).norm() < DOUBLE_CLICK_SLACK
-                        });
-                        if is_double_click {
+                    match action {
+                        Action::Press => drag_travel = 0.0,
+                        // Releasing without having moved is a click: focus whatever is under it.
+                        Action::Release if drag_travel < CLICK_SLACK => {
                             let screen_size = window.size().map(|x| x as f32);
-                            if let Some(body) =
-                                pick_body(&camera, &planets, &spacecraft, scale, pos, screen_size)
-                            {
-                                camera.set_at(body);
+                            let picked = cursor_pos.and_then(|pos| {
+                                pick_body(
+                                    &camera,
+                                    &system.star.name,
+                                    &planets,
+                                    &spacecraft,
+                                    scale,
+                                    pos,
+                                    screen_size,
+                                )
+                            });
+                            if let Some((name, position)) = picked {
+                                camera.set_at(position);
+                                focus = Some((name.to_owned(), Instant::now()));
                             }
                         }
-                        // A double click must not also start a triple one.
-                        last_click = (!is_double_click).then_some((now, pos));
+                        Action::Release => {}
                     }
                 }
                 WindowEvent::CursorPos(x, y, _) => {
                     let pos = Point2::new(x as f32, y as f32);
                     if let (true, Some(previous_pos)) = (is_rotating, cursor_pos) {
                         let dpos = pos - previous_pos;
+                        drag_travel += dpos.norm();
                         camera.set_yaw(camera.yaw() + dpos.x * CAMERA_ROTATE_SENSITIVITY);
                         camera.set_pitch(camera.pitch() - dpos.y * CAMERA_ROTATE_SENSITIVITY);
                     }
@@ -367,6 +379,11 @@ async fn main() {
             &planets,
         );
 
+        focus = focus.filter(|(_, since)| since.elapsed() < FOCUS_LABEL_TIMEOUT);
+        if let Some((name, _)) = &focus {
+            draw_focus_label(&mut window, name, &hud_font);
+        }
+
         if CAMERA_ACCELERATION > f64::EPSILON {
             let at = camera.at();
             camera.set_up_axis(Vector3::new(0.0, 0.0, 1.0));
@@ -376,6 +393,15 @@ async fn main() {
             );
         }
     }
+}
+
+/// Draws the currently focused body's name across the top of the window. kiss3d cannot measure a
+/// string, so the horizontal centring is an estimate based on the glyph count.
+fn draw_focus_label(window: &mut Window, name: &str, hud_font: &Arc<Font>) {
+    let text = format!("Focus: {name}");
+    let width = text.chars().count() as f32 * TEXT_SIZE * FOCUS_LABEL_CHAR_WIDTH;
+    let x = (window.size().x as f32 - width).max(0.0) / 2.0;
+    window.draw_text(&text, &Point2::new(x, 0.0), TEXT_SIZE, hud_font, &Point3::new(1.0, 1.0, 1.0));
 }
 
 /// Position of the spacecraft relative to the star. Inside a planet's SOI its state vector is
@@ -391,28 +417,32 @@ fn heliocentric_r(spacecraft: &Spacecraft, planets: &[Body]) -> Vector3<f64> {
 /// screen, as long as it is within [`PICK_RADIUS`]. Bodies behind the camera are ignored: `project`
 /// divides by a negative w for those and would otherwise report a bogus, sometimes very close,
 /// screen position.
-fn pick_body(
+fn pick_body<'a>(
     camera: &ArcBall,
-    planets: &[Body],
+    star_name: &'a str,
+    planets: &'a [Body],
     spacecraft: &Spacecraft,
     scale: f64,
     cursor: Point2<f32>,
     screen_size: Vector2<f32>,
-) -> Option<Point3<f32>> {
-    let star = std::iter::once(Point3::origin());
-    let spacecraft = std::iter::once(Point3::from(
-        heliocentric_r(spacecraft, planets).map(|x| (scale * x) as f32),
+) -> Option<(&'a str, Point3<f32>)> {
+    let star = std::iter::once((star_name, Point3::origin()));
+    let spacecraft = std::iter::once((
+        SPACECRAFT_NAME,
+        Point3::from(heliocentric_r(spacecraft, planets).map(|x| (scale * x) as f32)),
     ));
-    let planets = planets.iter().map(|planet| Point3::from(planet.r.map(|x| (scale * x) as f32)));
+    let planets = planets.iter().map(|planet| {
+        (planet.body.name.as_str(), Point3::from(planet.r.map(|x| (scale * x) as f32)))
+    });
     star.chain(planets)
         .chain(spacecraft)
-        .filter(|body| (camera.view_transform() * body).z < 0.0)
-        .map(|body| {
+        .filter(|(_, body)| (camera.view_transform() * body).z < 0.0)
+        .map(|(name, body)| {
             let projected = camera.project(&body, &screen_size);
             // `project` measures y upwards from the bottom, cursor coordinates downwards from
             // the top.
             let projected = Point2::new(projected.x, screen_size.y - projected.y);
-            (body, (projected - cursor).norm())
+            ((name, body), (projected - cursor).norm())
         })
         .filter(|&(_, distance)| distance < PICK_RADIUS)
         .min_by(|(_, a), (_, b)| a.total_cmp(b))

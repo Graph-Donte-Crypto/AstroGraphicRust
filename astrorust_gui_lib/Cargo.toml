@@ -11,5 +11,3 @@ path = "src/lib.rs"
 [dependencies]
 astrorust_lib = { path = "../astrorust_lib" }
 kiss3d = { workspace = true }
-kiss3d-trackball = "0.7.0"
-lazy_static = "1.4.0"
